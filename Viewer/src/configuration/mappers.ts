@@ -1,7 +1,7 @@
 import { Tools } from 'babylonjs';
 import { ViewerConfiguration } from './configuration';
 
-import { kebabToCamel } from '../helper';
+import { kebabToCamel } from '../helper/';
 
 /**
  * This is the mapper's interface. Implement this function to create your own mapper and register it at the mapper manager
@@ -52,6 +52,10 @@ class HTMLMapper implements IMapper {
                         val = true;
                     } else if (val === "false") {
                         val = false;
+                    } else if (val === "undefined") {
+                        val = undefined;
+                    } else if (val === "null") {
+                        val = null;
                     } else {
                         var isnum = !isNaN(parseFloat(val)) && isFinite(val);///^\d+$/.test(val);
                         if (isnum) {

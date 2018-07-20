@@ -1,195 +1,73 @@
 {
-  "errors": 4287,
+  "errors": 4239,
   "babylon.typedoc.json": {
-    "errors": 4287,
-    "Animatable": {
-      "Class": {
-        "Comments": {
-          "MissingText": true
-        }
-      },
-      "Constructor": {
-        "new Animatable": {
-          "Comments": {
-            "MissingText": true
-          },
-          "Parameter": {
-            "scene": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "target": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "fromFrame": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "toFrame": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "loopAnimation": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "speedRatio": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "onAnimationEnd": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "animations": {
-              "Comments": {
-                "MissingText": true
-              }
-            }
-          }
-        }
-      },
+    "errors": 4239,
+    "AbstractMesh": {
       "Property": {
-        "animationStarted": {
-          "Comments": {
-            "MissingText": true
+        "showBoundingBox": {
+          "Naming": {
+            "NotPascalCase": true
+          }
+        }
+      }
+    },
+    "AbstractScene": {
+      "Property": {
+        "effectLayers": {
+          "Naming": {
+            "NotPascalCase": true
           }
         },
-        "fromFrame": {
-          "Comments": {
-            "MissingText": true
+        "layers": {
+          "Naming": {
+            "NotPascalCase": true
           }
         },
-        "loopAnimation": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "onAnimationEnd": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "target": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "toFrame": {
-          "Comments": {
-            "MissingText": true
+        "lensFlareSystems": {
+          "Naming": {
+            "NotPascalCase": true
           }
         }
       },
       "Method": {
-        "appendAnimations": {
-          "Comments": {
-            "MissingText": true
-          },
-          "Parameter": {
-            "target": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "animations": {
-              "Comments": {
-                "MissingText": true
-              }
-            }
+        "addEffectLayer": {
+          "Naming": {
+            "NotPascalCase": true
           }
         },
-        "disableBlending": {
-          "Comments": {
-            "MissingText": true
+        "addLensFlareSystem": {
+          "Naming": {
+            "NotPascalCase": true
           }
         },
-        "enableBlending": {
-          "Comments": {
-            "MissingText": true
-          },
-          "Parameter": {
-            "blendingSpeed": {
-              "Comments": {
-                "MissingText": true
-              }
-            }
+        "getGlowLayerByName": {
+          "Naming": {
+            "NotPascalCase": true
           }
         },
-        "getAnimationByTargetProperty": {
-          "Comments": {
-            "MissingText": true
-          },
-          "Parameter": {
-            "property": {
-              "Comments": {
-                "MissingText": true
-              }
-            }
+        "getHighlightLayerByName": {
+          "Naming": {
+            "NotPascalCase": true
           }
         },
-        "getAnimations": {
-          "Comments": {
-            "MissingText": true
+        "getLensFlareSystemByID": {
+          "Naming": {
+            "NotPascalCase": true
           }
         },
-        "getRuntimeAnimationByTargetProperty": {
-          "Comments": {
-            "MissingText": true
-          },
-          "Parameter": {
-            "property": {
-              "Comments": {
-                "MissingText": true
-              }
-            }
+        "getLensFlareSystemByName": {
+          "Naming": {
+            "NotPascalCase": true
           }
         },
-        "goToFrame": {
-          "Comments": {
-            "MissingText": true
-          },
-          "Parameter": {
-            "frame": {
-              "Comments": {
-                "MissingText": true
-              }
-            }
+        "removeEffectLayer": {
+          "Naming": {
+            "NotPascalCase": true
           }
         },
-        "pause": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "reset": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "restart": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "stop": {
-          "Comments": {
-            "MissingText": true
-          },
-          "Parameter": {
-            "animationName": {
-              "Comments": {
-                "MissingText": true
-              }
-            }
+        "removeLensFlareSystem": {
+          "Naming": {
+            "NotPascalCase": true
           }
         }
       }
@@ -711,11 +589,6 @@
         }
       },
       "Method": {
-        "addGamepad": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
         "addKeyboard": {
           "Comments": {
             "MissingText": true
@@ -732,6 +605,14 @@
           }
         },
         "addVRDeviceOrientation": {
+          "Comments": {
+            "MissingText": true
+          }
+        },
+        "addGamepad": {
+          "Naming": {
+            "NotPascalCase": true
+          },
           "Comments": {
             "MissingText": true
           }
@@ -1590,18 +1471,6 @@
             "MissingText": true
           }
         },
-        "readPixels": {
-          "Comments": {
-            "MissingText": true
-          },
-          "Parameter": {
-            "faceIndex": {
-              "Comments": {
-                "MissingText": true
-              }
-            }
-          }
-        },
         "releaseInternalTexture": {
           "Comments": {
             "MissingText": true
@@ -2116,11 +1985,6 @@
         }
       },
       "Method": {
-        "_rebuild": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
         "dispose": {
           "Comments": {
             "MissingText": true
@@ -4842,53 +4706,6 @@
               }
             }
           }
-        },
-        "UploadDDSLevels": {
-          "Comments": {
-            "MissingText": true
-          },
-          "Parameter": {
-            "engine": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "gl": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "arrayBuffer": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "info": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "loadMipmaps": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "faces": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "lodIndex": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "currentFace": {
-              "Comments": {
-                "MissingText": true
-              }
-            }
-          }
         }
       }
     },
@@ -4913,6 +4730,11 @@
         }
       },
       "Property": {
+        "onPropertyChangedObservable": {
+          "Comments": {
+            "MissingText": true
+          }
+        },
         "InspectorURL": {
           "Comments": {
             "MissingText": true
@@ -4931,9 +4753,6 @@
           }
         },
         "show": {
-          "Comments": {
-            "MissingText": true
-          },
           "Parameter": {
             "config": {
               "Comments": {
@@ -5360,6 +5179,90 @@
         "springiness": {
           "Comments": {
             "MissingText": true
+          }
+        }
+      }
+    },
+    "Engine": {
+      "Method": {
+        "beginOcclusionQuery": {
+          "Naming": {
+            "NotPascalCase": true
+          }
+        },
+        "beginTransformFeedback": {
+          "Naming": {
+            "NotPascalCase": true
+          }
+        },
+        "bindTransformFeedback": {
+          "Naming": {
+            "NotPascalCase": true
+          }
+        },
+        "bindTransformFeedbackBuffer": {
+          "Naming": {
+            "NotPascalCase": true
+          }
+        },
+        "createEffectForParticles": {
+          "Naming": {
+            "NotPascalCase": true
+          }
+        },
+        "createQuery": {
+          "Naming": {
+            "NotPascalCase": true
+          }
+        },
+        "createTransformFeedback": {
+          "Naming": {
+            "NotPascalCase": true
+          }
+        },
+        "deleteQuery": {
+          "Naming": {
+            "NotPascalCase": true
+          }
+        },
+        "deleteTransformFeedback": {
+          "Naming": {
+            "NotPascalCase": true
+          }
+        },
+        "endOcclusionQuery": {
+          "Naming": {
+            "NotPascalCase": true
+          }
+        },
+        "endTimeQuery": {
+          "Naming": {
+            "NotPascalCase": true
+          }
+        },
+        "endTransformFeedback": {
+          "Naming": {
+            "NotPascalCase": true
+          }
+        },
+        "getQueryResult": {
+          "Naming": {
+            "NotPascalCase": true
+          }
+        },
+        "isQueryResultAvailable": {
+          "Naming": {
+            "NotPascalCase": true
+          }
+        },
+        "setTranformFeedbackVaryings": {
+          "Naming": {
+            "NotPascalCase": true
+          }
+        },
+        "startTimeQuery": {
+          "Naming": {
+            "NotPascalCase": true
           }
         }
       }
@@ -5877,11 +5780,6 @@
             "MissingText": true
           }
         },
-        "addGamepad": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
         "addKeyboard": {
           "Comments": {
             "MissingText": true
@@ -5905,6 +5803,14 @@
           }
         },
         "addVirtualJoystick": {
+          "Comments": {
+            "MissingText": true
+          }
+        },
+        "addGamepad": {
+          "Naming": {
+            "NotPascalCase": true
+          },
           "Comments": {
             "MissingText": true
           }
@@ -6437,6 +6343,19 @@
         "texelWidth": {
           "Comments": {
             "MissingText": true
+          }
+        }
+      }
+    },
+    "GPUParticleSystem": {
+      "Method": {
+        "addColorGradient": {
+          "Parameter": {
+            "color1": {
+              "Comments": {
+                "MissingText": true
+              }
+            }
           }
         }
       }
@@ -7017,6 +6936,22 @@
         }
       }
     },
+    "InternalTexture": {
+      "Method": {
+        "_swapAndDie": {
+          "Comments": {
+            "MissingText": true
+          },
+          "Parameter": {
+            "target": {
+              "Comments": {
+                "MissingText": true
+              }
+            }
+          }
+        }
+      }
+    },
     "InterpolateValueAction": {
       "Class": {
         "Comments": {
@@ -7325,20 +7260,6 @@
           },
           "Parameter": {
             "val": {
-              "Comments": {
-                "MissingText": true
-              }
-            }
-          }
-        },
-        "uploadLevels": {
-          "Parameter": {
-            "gl": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "loadMipmaps": {
               "Comments": {
                 "MissingText": true
               }
@@ -8563,23 +8484,6 @@
             }
           }
         },
-        "render": {
-          "Comments": {
-            "MissingReturn": true
-          },
-          "Parameter": {
-            "subMesh": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "enableAlphaMode": {
-              "Comments": {
-                "MissingText": true
-              }
-            }
-          }
-        },
         "setMaterialByID": {
           "Comments": {
             "MissingReturn": true
@@ -9792,6 +9696,15 @@
         }
       }
     },
+    "MultiPointerScaleBehavior": {
+      "Constructor": {
+        "new MultiPointerScaleBehavior": {
+          "Comments": {
+            "MissingText": true
+          }
+        }
+      }
+    },
     "MultiRenderTarget": {
       "Class": {
         "Comments": {
@@ -10837,6 +10750,57 @@
         "ConvertPanoramaToCubemap": {
           "Parameter": {
             "inputHeight": {
+              "Comments": {
+                "MissingText": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "Particle": {
+      "Property": {
+        "_initialEndSpriteCellID": {
+          "Comments": {
+            "MissingText": true
+          }
+        }
+      }
+    },
+    "ParticleHelper": {
+      "Method": {
+        "ExportSet": {
+          "Comments": {
+            "MissingReturn": true
+          },
+          "Parameter": {
+            "systems": {
+              "Comments": {
+                "MissingText": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "ParticleSystem": {
+      "Method": {
+        "addColorGradient": {
+          "Comments": {
+            "MissingReturn": true
+          }
+        },
+        "removeColorGradient": {
+          "Comments": {
+            "MissingReturn": true
+          }
+        },
+        "_GetEffectCreationOptions": {
+          "Comments": {
+            "MissingText": true
+          },
+          "Parameter": {
+            "isAnimationSheetEnabled": {
               "Comments": {
                 "MissingText": true
               }
@@ -12252,6 +12216,15 @@
         }
       }
     },
+    "PointerDragBehavior": {
+      "Method": {
+        "releaseDrag": {
+          "Comments": {
+            "MissingText": true
+          }
+        }
+      }
+    },
     "PointerEventTypes": {
       "Class": {
         "Comments": {
@@ -13633,6 +13606,53 @@
           }
         },
         "CreateRGBTexture": {
+          "Comments": {
+            "MissingText": true
+          },
+          "Parameter": {
+            "data": {
+              "Comments": {
+                "MissingText": true
+              }
+            },
+            "width": {
+              "Comments": {
+                "MissingText": true
+              }
+            },
+            "height": {
+              "Comments": {
+                "MissingText": true
+              }
+            },
+            "scene": {
+              "Comments": {
+                "MissingText": true
+              }
+            },
+            "generateMipMaps": {
+              "Comments": {
+                "MissingText": true
+              }
+            },
+            "invertY": {
+              "Comments": {
+                "MissingText": true
+              }
+            },
+            "samplingMode": {
+              "Comments": {
+                "MissingText": true
+              }
+            },
+            "type": {
+              "Comments": {
+                "MissingText": true
+              }
+            }
+          }
+        },
+        "CreateRTexture": {
           "Comments": {
             "MissingText": true
           },
@@ -15193,6 +15213,27 @@
         }
       }
     },
+    "Scene": {
+      "Property": {
+        "forceShowBoundingBoxes": {
+          "Naming": {
+            "NotPascalCase": true
+          }
+        },
+        "gamepadManager": {
+          "Naming": {
+            "NotPascalCase": true
+          }
+        }
+      },
+      "Method": {
+        "getBoundingBoxRenderer": {
+          "Naming": {
+            "NotPascalCase": true
+          }
+        }
+      }
+    },
     "SceneInstrumentation": {
       "Constructor": {
         "new SceneInstrumentation": {
@@ -15943,6 +15984,15 @@
         }
       }
     },
+    "SixDofDragBehavior": {
+      "Constructor": {
+        "new SixDofDragBehavior": {
+          "Comments": {
+            "MissingText": true
+          }
+        }
+      }
+    },
     "Size": {
       "Class": {
         "Comments": {
@@ -16633,243 +16683,6 @@
         "switchPanningModelToHRTF": {
           "Comments": {
             "MissingText": true
-          }
-        }
-      }
-    },
-    "SphericalHarmonics": {
-      "Class": {
-        "Comments": {
-          "MissingText": true
-        }
-      },
-      "Property": {
-        "L00": {
-          "Naming": {
-            "NotCamelCase": true
-          },
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "L10": {
-          "Naming": {
-            "NotCamelCase": true
-          },
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "L11": {
-          "Naming": {
-            "NotCamelCase": true
-          },
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "L1_1": {
-          "Naming": {
-            "NotCamelCase": true
-          },
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "L20": {
-          "Naming": {
-            "NotCamelCase": true
-          },
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "L21": {
-          "Naming": {
-            "NotCamelCase": true
-          },
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "L22": {
-          "Naming": {
-            "NotCamelCase": true
-          },
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "L2_1": {
-          "Naming": {
-            "NotCamelCase": true
-          },
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "L2_2": {
-          "Naming": {
-            "NotCamelCase": true
-          },
-          "Comments": {
-            "MissingText": true
-          }
-        }
-      },
-      "Method": {
-        "addLight": {
-          "Comments": {
-            "MissingText": true
-          },
-          "Parameter": {
-            "direction": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "color": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "deltaSolidAngle": {
-              "Comments": {
-                "MissingText": true
-              }
-            }
-          }
-        },
-        "convertIncidentRadianceToIrradiance": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "convertIrradianceToLambertianRadiance": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "scale": {
-          "Comments": {
-            "MissingText": true
-          },
-          "Parameter": {
-            "scale": {
-              "Comments": {
-                "MissingText": true
-              }
-            }
-          }
-        },
-        "getsphericalHarmonicsFromPolynomial": {
-          "Naming": {
-            "NotPascalCase": true
-          },
-          "Comments": {
-            "MissingText": true
-          },
-          "Parameter": {
-            "polynomial": {
-              "Comments": {
-                "MissingText": true
-              }
-            }
-          }
-        }
-      }
-    },
-    "SphericalPolynomial": {
-      "Class": {
-        "Comments": {
-          "MissingText": true
-        }
-      },
-      "Property": {
-        "x": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "xx": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "xy": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "y": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "yy": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "yz": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "z": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "zx": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "zz": {
-          "Comments": {
-            "MissingText": true
-          }
-        }
-      },
-      "Method": {
-        "addAmbient": {
-          "Comments": {
-            "MissingText": true
-          },
-          "Parameter": {
-            "color": {
-              "Comments": {
-                "MissingText": true
-              }
-            }
-          }
-        },
-        "scale": {
-          "Comments": {
-            "MissingText": true
-          },
-          "Parameter": {
-            "scale": {
-              "Comments": {
-                "MissingText": true
-              }
-            }
-          }
-        },
-        "getSphericalPolynomialFromHarmonics": {
-          "Naming": {
-            "NotPascalCase": true
-          },
-          "Comments": {
-            "MissingText": true
-          },
-          "Parameter": {
-            "harmonics": {
-              "Comments": {
-                "MissingText": true
-              }
-            }
           }
         }
       }
@@ -18314,23 +18127,6 @@
             }
           }
         },
-        "UploadContent": {
-          "Comments": {
-            "MissingText": true
-          },
-          "Parameter": {
-            "gl": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "data": {
-              "Comments": {
-                "MissingText": true
-              }
-            }
-          }
-        },
         "_getImageData16bits": {
           "Comments": {
             "MissingText": true
@@ -19342,6 +19138,11 @@
             "MissingText": true
           }
         },
+        "Color4": {
+          "Comments": {
+            "MissingText": true
+          }
+        },
         "Matrix": {
           "Comments": {
             "MissingText": true
@@ -19645,28 +19446,6 @@
           },
           "Parameter": {
             "buffer": {
-              "Comments": {
-                "MissingText": true
-              }
-            }
-          }
-        },
-        "EncodeScreenshotCanvasData": {
-          "Comments": {
-            "MissingText": true
-          },
-          "Parameter": {
-            "successCallback": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "mimeType": {
-              "Comments": {
-                "MissingText": true
-              }
-            },
-            "fileName": {
               "Comments": {
                 "MissingText": true
               }
@@ -20323,11 +20102,6 @@
           }
         },
         "_worldMatrixDeterminant": {
-          "Comments": {
-            "MissingText": true
-          }
-        },
-        "billboardMode": {
           "Comments": {
             "MissingText": true
           }
@@ -21942,6 +21716,13 @@
           "MissingText": true
         }
       },
+      "Property": {
+        "onUserActionRequestedObservable": {
+          "Comments": {
+            "MissingText": true
+          }
+        }
+      },
       "Method": {
         "CreateFromWebCam": {
           "Comments": {
@@ -22827,6 +22608,19 @@
         "blocks": {
           "Comments": {
             "MissingText": true
+          }
+        }
+      }
+    },
+    "IParticleSystem": {
+      "Method": {
+        "addColorGradient": {
+          "Parameter": {
+            "color1": {
+              "Comments": {
+                "MissingText": true
+              }
+            }
           }
         }
       }

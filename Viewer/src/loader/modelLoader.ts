@@ -1,11 +1,11 @@
-import { AbstractViewer } from "../viewer/viewer";
-import { ISceneLoaderPlugin, ISceneLoaderPluginAsync, Tools, SceneLoader, Tags } from "babylonjs";
-import { GLTFFileLoader, GLTFLoaderAnimationStartMode } from "babylonjs-loaders";
-import { IModelConfiguration } from "../configuration/configuration";
-import { ViewerModel, ModelState } from "../model/viewerModel";
-import { ILoaderPlugin } from './plugins/loaderPlugin';
-import { TelemetryLoaderPlugin } from './plugins/telemetryLoaderPlugin';
-import { getLoaderPluginByName } from './plugins/';
+import { ISceneLoaderPlugin, ISceneLoaderPluginAsync, SceneLoader, Tags, Tools } from 'babylonjs';
+import { GLTFFileLoader, GLTFLoaderAnimationStartMode } from 'babylonjs-loaders';
+
+import { ConfigurationContainer } from '../configuration/configurationContainer';
+import { IModelConfiguration } from '../configuration/interfaces/modelConfiguration';
+import { ObservablesManager } from '../managers/observablesManager';
+import { ModelState, ViewerModel } from '../model/viewerModel';
+import { getLoaderPluginByName, ILoaderPlugin } from './plugins/';
 
 /**
  * An instance of the class is in charge of loading the model correctly.
@@ -22,11 +22,17 @@ export class ModelLoader {
 
     private _plugins: Array<ILoaderPlugin>;
 
+    private _baseUrl: string;
+
+    public get baseUrl(): string {
+        return this._baseUrl;
+    }
+
     /**
      * Create a new Model loader
      * @param _viewer the viewer using this model loader
      */
-    constructor(private _viewer: AbstractViewer) {
+    constructor(private _observablesManager: ObservablesManager, private _configurationContainer?: ConfigurationContainer) {
         this._loaders = [];
         this._loadId = 0;
         this._plugins = [];
@@ -58,31 +64,32 @@ export class ModelLoader {
      */
     public load(modelConfiguration: IModelConfiguration): ViewerModel {
 
-        const model = new ViewerModel(this._viewer, modelConfiguration);
+        const model = new ViewerModel(this._observablesManager, modelConfiguration, this._configurationContainer);
 
         model.loadId = this._loadId++;
 
-        if (!modelConfiguration.url) {
+        let filename: any;
+        if (modelConfiguration.file) {
+            this._baseUrl = "file:";
+            filename = modelConfiguration.file;
+        }
+        else if (modelConfiguration.url) {
+            filename = Tools.GetFilename(modelConfiguration.url) || modelConfiguration.url;
+            this._baseUrl = modelConfiguration.root || Tools.GetFolderPath(modelConfiguration.url);
+        }
+
+        if (!filename || !this._baseUrl) {
             model.state = ModelState.ERROR;
             Tools.Error("No URL provided");
             return model;
         }
 
-        let base: string;
-        let filename: any;
-        if (modelConfiguration.file) {
-            base = "file:";
-            filename = modelConfiguration.file;
-        }
-        else {
-            filename = Tools.GetFilename(modelConfiguration.url) || modelConfiguration.url;
-            base = modelConfiguration.root || Tools.GetFolderPath(modelConfiguration.url);
-        }
-
 
         let plugin = modelConfiguration.loader;
 
-        model.loader = SceneLoader.ImportMesh(undefined, base, filename, this._viewer.sceneManager.scene, (meshes, particleSystems, skeletons, animationGroups) => {
+        let scene = model.rootMesh.getScene();
+
+        model.loader = SceneLoader.ImportMesh(undefined, this._baseUrl, filename, scene, (meshes, particleSystems, skeletons, animationGroups) => {
             meshes.forEach(mesh => {
                 Tags.AddTagsTo(mesh, "viewerMesh");
                 model.addMesh(mesh);
@@ -95,7 +102,7 @@ export class ModelLoader {
             }
 
             this._checkAndRun("onLoaded", model);
-            this._viewer.sceneManager.scene.executeWhenReady(() => {
+            scene.executeWhenReady(() => {
                 model.onLoadedObservable.notifyObservers(model);
             });
         }, (progressEvent) => {
@@ -119,7 +126,11 @@ export class ModelLoader {
                 };
             }
             // if ground is set to "mirror":
-            if (this._viewer.configuration.ground && typeof this._viewer.configuration.ground === 'object' && this._viewer.configuration.ground.mirror) {
+            if (this._configurationContainer
+                && this._configurationContainer.configuration
+                && this._configurationContainer.configuration.ground
+                && typeof this._configurationContainer.configuration.ground === 'object'
+                && this._configurationContainer.configuration.ground.mirror) {
                 gltfLoader.useClipPlane = true;
             }
             Object.keys(gltfLoader).filter(name => name.indexOf('on') === 0 && name.indexOf('Observable') !== -1).forEach(functionName => {

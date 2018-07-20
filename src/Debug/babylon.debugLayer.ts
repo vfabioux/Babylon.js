@@ -12,10 +12,10 @@ module BABYLON {
 
         private BJSINSPECTOR = typeof INSPECTOR !== 'undefined' ? INSPECTOR : undefined;
 
+        public onPropertyChangedObservable = new BABYLON.Observable<{ object: any, property: string, value: any, initialValue: any }>();
+
         constructor(scene: Scene) {
             this._scene = scene;
-            // load inspector using require, if it doesn't exist on the global namespace.
-
         }
 
         /** Creates the inspector window. */
@@ -39,8 +39,8 @@ module BABYLON {
             if (!this._inspector) {
                 this.BJSINSPECTOR = this.BJSINSPECTOR || typeof INSPECTOR !== 'undefined' ? INSPECTOR : undefined;
 
-                this._inspector = new this.BJSINSPECTOR.Inspector(this._scene, popup, initialTab, parentElement, config.newColors);
-            } // else nothing to do,; instance is already existing
+                this._inspector = new this.BJSINSPECTOR.Inspector(this._scene, popup, initialTab, parentElement, config.newColors);               
+            } // else nothing to do as instance is already created
         }
 
         public isVisible(): boolean {
@@ -57,9 +57,32 @@ module BABYLON {
                 } catch (e) {
                     // If the inspector has been removed directly from the inspector tool
                 }
+                this.onPropertyChangedObservable.clear();
                 this._inspector = null;
             }
         }
+        
+        /**
+        *
+        * Launch the debugLayer.
+        *
+        * initialTab:
+        * | Value | Tab Name |
+        * | --- | --- |
+        * | 0 | Scene |
+        * | 1 | Console |
+        * | 2 | Stats |
+        * | 3 | Textures |
+        * | 4 | Mesh |
+        * | 5 | Light |
+        * | 6 | Material |
+        * | 7 | GLTF |
+        * | 8 | GUI |
+        * | 9 | Physics |
+        * | 10 | Camera |
+        * | 11 | Audio |
+        *
+        */
 
         public show(config: {
             popup?: boolean,

@@ -1,7 +1,12 @@
 ﻿/// <reference path="../../../../dist/preview release/babylon.d.ts"/>
-/// <reference path="../../../../dist/preview release/gltf2Interface/babylon.glTF2Interface.d.ts"/>
+/// <reference path="../../../../dist/preview release/glTF2Interface/babylon.glTF2Interface.d.ts"/>
 
 module BABYLON.GLTF2 {
+    /** @hidden */
+    export interface _IArrayItem {
+        _index: number;
+    }
+
     /** @hidden */
     export interface _ILoaderAccessor extends IAccessor, _IArrayItem {
         _data?: Promise<ArrayBufferView>;
@@ -21,7 +26,7 @@ module BABYLON.GLTF2 {
 
     /** @hidden */
     export interface _ILoaderAnimationSampler extends IAnimationSampler, _IArrayItem {
-        _data: Promise<_ILoaderAnimationSamplerData>;
+        _data?: Promise<_ILoaderAnimationSamplerData>;
     }
 
     /** @hidden */
@@ -49,7 +54,7 @@ module BABYLON.GLTF2 {
 
     /** @hidden */
     export interface _ILoaderImage extends IImage, _IArrayItem {
-        _blob?: Promise<Blob>;
+        _data?: Promise<ArrayBufferView>;
     }
 
     /** @hidden */
@@ -74,7 +79,7 @@ module BABYLON.GLTF2 {
 
     /** @hidden */
     export interface _ILoaderNode extends INode, _IArrayItem {
-        _parent: _ILoaderNode;
+        _parent?: _ILoaderNode;
         _babylonMesh?: Mesh;
         _primitiveBabylonMeshes?: Mesh[];
         _babylonBones?: Bone[];

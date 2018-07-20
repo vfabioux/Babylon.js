@@ -106,6 +106,7 @@
         public REFLECTIONMAP_OPPOSITEZ = false;
         public LODINREFLECTIONALPHA = false;
         public GAMMAREFLECTION = false;
+        public RGBDREFLECTION = false;
         public EQUIRECTANGULAR_RELFECTION_FOV = false;
 
         // Default BJS.
@@ -409,10 +410,12 @@
             }
 
             // Attaches observer.
-            this._imageProcessingObserver = this._imageProcessingConfiguration.onUpdateParameters.add(conf => {
-                this._computePrimaryColorFromPerceptualColor();
-                this._markAllSubMeshesAsImageProcessingDirty();
-            });
+            if (this._imageProcessingConfiguration) {
+                this._imageProcessingObserver = this._imageProcessingConfiguration.onUpdateParameters.add(conf => {
+                    this._computePrimaryColorFromPerceptualColor();
+                    this._markAllSubMeshesAsImageProcessingDirty();
+                });
+            }
         }
 
         /**
@@ -655,6 +658,7 @@
 
                         defines.REFLECTION = true;
                         defines.GAMMAREFLECTION = reflectionTexture.gammaSpace;
+                        defines.RGBDREFLECTION = reflectionTexture.isRGBD;
                         defines.REFLECTIONBLUR = this._reflectionBlur > 0;
                         defines.REFLECTIONMAP_OPPOSITEZ = this.getScene().useRightHandedSystem ? !reflectionTexture.invertZ : reflectionTexture.invertZ;
                         defines.LODINREFLECTIONALPHA = reflectionTexture.lodLevelInAlpha;
@@ -730,6 +734,7 @@
                         defines.REFLECTIONMAP_OPPOSITEZ = false;
                         defines.LODINREFLECTIONALPHA = false;
                         defines.GAMMAREFLECTION = false;
+                        defines.RGBDREFLECTION = false;
                     }
                 }
 
@@ -742,7 +747,7 @@
                 defines.USEHIGHLIGHTANDSHADOWCOLORS = !this._useRGBColor && (this._primaryColorShadowLevel !== 0 || this._primaryColorHighlightLevel !== 0);
             }
 
-            if (defines._areImageProcessingDirty) {
+            if (defines._areImageProcessingDirty && this._imageProcessingConfiguration) {
                 if (!this._imageProcessingConfiguration.isReady()) {
                     return false;
                 }
@@ -822,8 +827,10 @@
                 var samplers = ["diffuseSampler", "reflectionSampler", "reflectionSamplerLow", "reflectionSamplerHigh"];
                 var uniformBuffers = ["Material", "Scene"];
 
-                ImageProcessingConfiguration.PrepareUniforms(uniforms, defines);
-                ImageProcessingConfiguration.PrepareSamplers(samplers, defines);
+                if (ImageProcessingConfiguration) {
+                    ImageProcessingConfiguration.PrepareUniforms(uniforms, defines);
+                    ImageProcessingConfiguration.PrepareSamplers(samplers, defines);
+                }
 
                 MaterialHelper.PrepareUniformsAndSamplersList(<EffectCreationOptions>{
                     uniformsNames: uniforms,
@@ -1069,12 +1076,14 @@
                 MaterialHelper.BindFogParameters(scene, mesh, this._activeEffect);
 
                 // image processing
-                this._imageProcessingConfiguration.bind(this._activeEffect);
+                if (this._imageProcessingConfiguration) {
+                    this._imageProcessingConfiguration.bind(this._activeEffect);
+                }
             }
 
             this._uniformBuffer.update();
 
-            this._afterBind(mesh);
+            this._afterBind(mesh, this._activeEffect);
         }
 
         /**

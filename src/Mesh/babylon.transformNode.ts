@@ -25,6 +25,18 @@ module BABYLON {
         protected _isDirty = false;
         private _transformToBoneReferal: Nullable<TransformNode>;
 
+        /**
+        * Set the billboard mode. Default is 0.
+        *
+        * | Value | Type | Description |
+        * | --- | --- | --- |
+        * | 0 | BILLBOARDMODE_NONE |  |
+        * | 1 | BILLBOARDMODE_X |  |
+        * | 2 | BILLBOARDMODE_Y |  |
+        * | 4 | BILLBOARDMODE_Z |  |
+        * | 7 | BILLBOARDMODE_ALL |  |
+        *
+        */
         @serialize()
         public billboardMode = TransformNode.BILLBOARDMODE_NONE;
 
@@ -33,6 +45,13 @@ module BABYLON {
 
         @serialize()
         public infiniteDistance = false;
+
+        /**
+         * Gets or sets a boolean indicating that non uniform scaling (when at least one component is different from others) should be ignored.
+         * By default the system will update normals to compensate
+         */
+        @serialize()
+        public ignoreNonUniformScaling = false;        
 
         @serializeAsVector3()
         public position = Vector3.Zero();
@@ -517,8 +536,10 @@ module BABYLON {
          * Returns the TransformNode.
          */
         public setParent(node: Nullable<Node>): TransformNode {
-
-            if (node === null) {
+            if (!node && !this.parent) {
+                return this;
+            }
+            if (!node) {
                 var rotation = Tmp.Quaternion[0];
                 var position = Tmp.Vector3[0];
                 var scale = Tmp.Vector3[1];
@@ -585,7 +606,7 @@ module BABYLON {
                 return false;
             }
 
-            this._nonUniformScaling = true;
+            this._nonUniformScaling = value;
             return true;
         }
 
@@ -771,7 +792,7 @@ module BABYLON {
                 Matrix.RotationYawPitchRollToRef(this.rotation.y, this.rotation.x, this.rotation.z, Tmp.Matrix[0]);
                 this._cache.rotation.copyFrom(this.rotation);
             }
-
+          
             // Translation
             let camera = (<Camera>this.getScene().activeCamera);
 
@@ -788,7 +809,7 @@ module BABYLON {
             }
 
             // Composing transformations
-            this._pivotMatrix.multiplyToRef(Tmp.Matrix[1], Tmp.Matrix[4]);
+            this._pivotMatrix.multiplyToRef(Tmp.Matrix[1], Tmp.Matrix[4]);           
             Tmp.Matrix[4].multiplyToRef(Tmp.Matrix[0], Tmp.Matrix[5]);
 
             // Billboarding (testing PG:http://www.babylonjs-playground.com/#UJEIL#13)
@@ -835,6 +856,11 @@ module BABYLON {
                 Tmp.Matrix[1].multiplyToRef(Tmp.Matrix[0], Tmp.Matrix[5]);
             }
 
+            // Post multiply inverse of pivotMatrix
+            if (this._postMultiplyPivotMatrix) {
+                Tmp.Matrix[5].multiplyToRef(this._pivotMatrixInverse, Tmp.Matrix[5]);
+            }           
+
             // Local world
             Tmp.Matrix[5].multiplyToRef(Tmp.Matrix[2], this._localWorld);
 
@@ -866,17 +892,17 @@ module BABYLON {
                 this._worldMatrix.copyFrom(this._localWorld);
             }
 
-            // Post multiply inverse of pivotMatrix
-            if (this._postMultiplyPivotMatrix) {
-                this._worldMatrix.multiplyToRef(this._pivotMatrixInverse, this._worldMatrix);
-            }
 
             // Normal matrix
-            if (this.scaling.isNonUniform) {
-                this._updateNonUniformScalingState(true);
-            } else if (this.parent && (<TransformNode>this.parent)._nonUniformScaling) {
-                this._updateNonUniformScalingState((<TransformNode>this.parent)._nonUniformScaling);
-            } else {
+            if (!this.ignoreNonUniformScaling) {
+                if (this.scaling.isNonUniform) {
+                    this._updateNonUniformScalingState(true);
+                } else if (this.parent && (<TransformNode>this.parent)._nonUniformScaling) {
+                    this._updateNonUniformScalingState((<TransformNode>this.parent)._nonUniformScaling);
+                } else {
+                    this._updateNonUniformScalingState(false);
+                }
+            }else {
                 this._updateNonUniformScalingState(false);
             }
 

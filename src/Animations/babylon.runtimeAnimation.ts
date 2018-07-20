@@ -391,7 +391,7 @@
          * @param loop defines if the current animation must loop
          * @param speedRatio defines the current speed ratio
          * @param weight defines the weight of the animation (default is -1 so no weight)
-         * @returns a boolean indicating if the animation has ended
+         * @returns a boolean indicating if the animation is running
          */
         public animate(delay: number, from: number, to: number, loop: boolean, speedRatio: number, weight = -1.0): boolean {
             let targetPropertyPath = this._animation.targetPropertyPath
@@ -399,13 +399,20 @@
                 this._stopped = true;
                 return false;
             }
+
             var returnValue = true;
+
             let keys = this._animation.getKeys();
 
             // Adding a start key at frame 0 if missing
             if (keys[0].frame !== 0) {
                 var newKey = { frame: 0, value: keys[0].value };
                 keys.splice(0, 0, newKey);
+            }
+            // Adding a duplicate key when there is only one key at frame zero
+            else if (keys.length === 1) {
+                var newKey = { frame: 0.001, value: keys[0].value };
+                keys.push(newKey);
             }
 
             // Check limits
@@ -424,7 +431,7 @@
                     to++;
                 }
             }
-            
+
             // Compute ratio
             var range = to - from;
             var offsetValue;
@@ -435,7 +442,7 @@
             this._previousDelay = delay;
             this._previousRatio = ratio;
 
-            if (((to > from && ratio > range) || (from > to && ratio < range)) && !loop) { // If we are out of range and not looping get back to caller
+            if (((to > from && ratio >= range) || (from > to && ratio <= range)) && !loop) { // If we are out of range and not looping get back to caller
                 returnValue = false;
                 highLimitValue = this._animation._getKeyValue(keys[keys.length - 1].value);
             } else {

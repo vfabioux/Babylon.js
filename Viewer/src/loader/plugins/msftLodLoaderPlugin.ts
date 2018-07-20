@@ -1,8 +1,8 @@
-import { ILoaderPlugin } from "./loaderPlugin";
-import { telemetryManager } from "../../telemetryManager";
-import { ViewerModel } from "../..";
-import { Tools, ISceneLoaderPlugin, ISceneLoaderPluginAsync } from "babylonjs";
-import { IGLTFLoaderExtension, GLTF2 } from "babylonjs-loaders";
+import { ISceneLoaderPlugin, ISceneLoaderPluginAsync } from 'babylonjs';
+import { GLTF2, IGLTFLoaderExtension } from 'babylonjs-loaders';
+
+import { ViewerModel } from '../../model/viewerModel';
+import { ILoaderPlugin } from './loaderPlugin';
 
 /**
  * A loder plugin to use MSFT_lod extension correctly (glTF)

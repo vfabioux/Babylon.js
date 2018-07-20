@@ -1,7 +1,6 @@
-import { ILoaderPlugin } from "./loaderPlugin";
-import { telemetryManager } from "../../telemetryManager";
-import { ViewerModel } from "../..";
-import { Color3, Texture, BaseTexture, Tools, ISceneLoaderPlugin, ISceneLoaderPluginAsync, Material, PBRMaterial, Engine } from "babylonjs";
+import { Engine, Material, PBRMaterial } from 'babylonjs';
+
+import { ILoaderPlugin } from './loaderPlugin';
 
 /**
  * A (PBR) material will be extended using this function.

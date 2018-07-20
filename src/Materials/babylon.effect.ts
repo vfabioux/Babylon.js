@@ -533,7 +533,8 @@
             this._engine._loadFile(fragmentShaderUrl + ".fragment.fx", callback);
         }
 
-        private _dumpShadersSource(vertexCode: string, fragmentCode: string, defines: string): void {
+        /** @hidden */
+        public _dumpShadersSource(vertexCode: string, fragmentCode: string, defines: string): void {
             // Rebuild shaders source code
             var shaderVersion = (this._engine.webGLVersion > 1) ? "#version 300 es\n#define WEBGL2 \n" : "";
             var prefix = shaderVersion + (defines ? defines + "\n" : "");
@@ -818,7 +819,6 @@
                 Tools.Error("Attributes: " + attributesNames.map(function (attribute) {
                     return " " + attribute;
                 }));
-                this._dumpShadersSource(this._vertexSourceCode, this._fragmentSourceCode, defines);
                 Tools.Error("Error: " + this._compilationError);
                 if (previousProgram) {
                     this._program = previousProgram;
@@ -1421,6 +1421,22 @@
                 this._engine.setDirectColor4(this.getUniform(uniformName), color4);
             }
             return this;
+        }
+
+        /**
+         * This function will add a new shader to the shader store
+         * @param name the name of the shader
+         * @param pixelShader optional pixel shader content
+         * @param vertexShader optional vertex shader content
+         */
+        public static RegisterShader(name: string, pixelShader?: string, vertexShader?: string) {
+            if (pixelShader) {
+                Effect.ShadersStore[`${name}PixelShader`] = pixelShader;
+            }
+
+            if (vertexShader) {
+                Effect.ShadersStore[`${name}VertexShader`] = vertexShader;
+            }
         }
 
         /**

@@ -59,6 +59,13 @@
 
         /**
         * Scale mode for the post process (default: Engine.SCALEMODE_FLOOR)
+	*
+	* | Value | Type                                | Description |
+        * | ----- | ----------------------------------- | ----------- |
+        * | 1     | SCALEMODE_FLOOR                     | [engine.scalemode_floor](http://doc.babylonjs.com/api/classes/babylon.engine#scalemode_floor) |
+        * | 2     | SCALEMODE_NEAREST                   | [engine.scalemode_nearest](http://doc.babylonjs.com/api/classes/babylon.engine#scalemode_nearest) |
+        * | 3     | SCALEMODE_CEILING                   | [engine.scalemode_ceiling](http://doc.babylonjs.com/api/classes/babylon.engine#scalemode_ceiling) |
+	* 
         */
         public scaleMode = Engine.SCALEMODE_FLOOR;
         /**
@@ -461,7 +468,7 @@
             this.onActivateObservable.notifyObservers(camera);
 
             // Clear
-            if (this.autoClear && this.alphaMode === Engine.ALPHA_DISABLE) {
+            if (scene._allowPostProcessClear && this.autoClear && this.alphaMode === Engine.ALPHA_DISABLE) {
                 this._engine.clear(this.clearColor ? this.clearColor : scene.clearColor, true, true, true);
             }
 

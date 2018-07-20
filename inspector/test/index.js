@@ -77,14 +77,20 @@ var Test = (function () {
         }
 
         let t = 0;
-        // scene.registerBeforeRender(() => {
-        //     ground.rotation.y += 0.01;
-        //     ground.position.y = Math.cos(t += 0.01);
-        // });
+        scene.registerBeforeRender(() => {
+            ground.rotation.y += 0.01;
+            ground.position.y = Math.cos(t += 0.01);
+        });
 
         scene.createDefaultCameraOrLight(true);
         scene.activeCamera.attachControl(canvas);
         scene.debugLayer.show();
+        scene.debugLayer.onPropertyChangedObservable.add((result) => {
+            console.log(result.object);
+            console.log("Property : " + result.property);
+            console.log("New value : " + result.value);
+            console.log("Old value : " + result.initialValue);
+        });
 
         this.scene = scene;
     };

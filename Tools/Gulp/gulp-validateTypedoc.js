@@ -223,7 +223,9 @@ Validate.prototype.add = function (filePath, content) {
     var json = JSON.parse(contentString);
 
     this.validateTypedoc(json);
-    this.results.errors += this.results[this.filePath].errors;
+    if (this.results[this.filePath]) {
+        this.results.errors += this.results[this.filePath].errors;
+    }
 }
 
 Validate.prototype.getResults = function () {
@@ -249,14 +251,6 @@ Validate.prototype.validateTypedoc = function (json) {
 Validate.prototype.validateTypedocNamespaces = function (namespaces) {
     var namespace = null;
 
-    var containerNode;
-    var childNode;
-    var children;
-    var signatures;
-    var signatureNode;
-    var tags;
-    var isPublic;
-
     // Check for BABYLON namespace
     for (var child in namespaces) {
         if (namespaces[child].name === this.namespaceName) {
@@ -270,9 +264,31 @@ Validate.prototype.validateTypedocNamespaces = function (namespaces) {
         return;
     }
 
-    // Validate Classes
+    // Validate the namespace.
+    this.validateTypedocNamespace(namespace);
+}
+
+/**
+ * Validate classes and modules attach to a declaration file from a TypeDoc JSON file
+ */
+Validate.prototype.validateTypedocNamespace = function(namespace) {
+    var containerNode;
+    var childNode;
+    var children;
+    var signatures;
+    var signatureNode;
+    var tags;
+    var isPublic;
+
     for (var a in namespace.children) {
         containerNode = namespace.children[a];
+
+        // Validate Sub Module
+        if (containerNode.kindString === "Module") {
+            this.validateTypedocNamespace(containerNode);
+            continue;
+        }
+        // else Validate Classes
 
         // Account for undefined access modifiers.
         if (!containerNode.flags.isPublic &&
@@ -286,7 +302,7 @@ Validate.prototype.validateTypedocNamespaces = function (namespaces) {
         this.validateNaming(null, containerNode);
 
         // Validate Comments.
-        if (isPublic && !this.validateComment(containerNode)) {      
+        if (isPublic && !this.validateComment(containerNode)) {
             this.errorCallback(null,
                 containerNode.name,
                 containerNode.kindString,

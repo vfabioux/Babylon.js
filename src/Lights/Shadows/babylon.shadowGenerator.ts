@@ -1374,6 +1374,7 @@
             serializationObject.blurScale = this.blurScale;
             serializationObject.useKernelBlur = this.useKernelBlur;
             serializationObject.transparencyShadow = this._transparencyShadow;
+            serializationObject.frustumEdgeFalloff = this.frustumEdgeFalloff;
 
             serializationObject.bias = this.bias;
             serializationObject.normalBias = this.normalBias;
@@ -1402,8 +1403,7 @@
          * @returns The parsed shadow generator
          */
         public static Parse(parsedShadowGenerator: any, scene: Scene): ShadowGenerator {
-            //casting to point light, as light is missing the position attr and typescript complains.
-            var light = <PointLight>scene.getLightByID(parsedShadowGenerator.lightId);
+            var light = <IShadowLight>scene.getLightByID(parsedShadowGenerator.lightId);
             var shadowGenerator = new ShadowGenerator(parsedShadowGenerator.mapSize, light);
             var shadowMap = shadowGenerator.getShadowMap();
 
@@ -1484,6 +1484,10 @@
 
             if (parsedShadowGenerator.normalBias !== undefined) {
                 shadowGenerator.normalBias = parsedShadowGenerator.normalBias;
+            }
+
+            if (parsedShadowGenerator.frustumEdgeFalloff !== undefined) {
+                shadowGenerator.frustumEdgeFalloff = parsedShadowGenerator.frustumEdgeFalloff;
             }
 
             if (parsedShadowGenerator.darkness) {

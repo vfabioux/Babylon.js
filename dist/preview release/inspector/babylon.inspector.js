@@ -17,7 +17,7 @@ var INSPECTOR;
                     //Load properties of GUI objects now as BABYLON.GUI has to be declared before 
                     INSPECTOR.loadGUIProperties();
                 }, function () {
-                    console.warn("Please add script https://preview.babylonjs.com/gui/babylon.gui.js to the HTML file");
+                    console.warn('Error : loading "babylon.gui.js". Please add script https://preview.babylonjs.com/gui/babylon.gui.js to the HTML file.');
                 });
             }
             else {
@@ -146,10 +146,14 @@ var INSPECTOR;
                 INSPECTOR.Helpers.SEND_EVENT('resize');
                 this._tabbar.updateWidth();
             }
-            // Refresh the inspector if the browser is not edge
-            if (!INSPECTOR.Helpers.IsBrowserEdge()) {
-                this.refresh();
-            }
+            /*
+            * Refresh the inspector if the browser is not edge
+            *   Why not ?! Condition commented on 180525
+            *   To be tested
+            */
+            // if (!Helpers.IsBrowserEdge()) {
+            this.refresh();
+            // }
             // Check custom css colors
             if (newColors) {
                 var bColor = newColors.backgroundColor || '#242424';
@@ -297,52 +301,48 @@ var INSPECTOR;
          */
         Inspector.prototype.openPopup = function (firstTime) {
             var _this = this;
-            if (INSPECTOR.Helpers.IsBrowserEdge()) {
-                console.warn('Inspector - Popup mode is disabled in Edge, as the popup DOM cannot be updated from the main window for security reasons');
+            // Create popup
+            var popup = window.open('', 'Babylon.js INSPECTOR', 'toolbar=no,resizable=yes,menubar=no,width=750,height=1000');
+            if (!popup) {
+                alert("Please update your browser to open the Babylon.js inspector in an external view.");
+                return;
             }
-            else {
-                // Create popup
-                var popup = window.open('', 'Babylon.js INSPECTOR', 'toolbar=no,resizable=yes,menubar=no,width=750,height=1000');
-                if (!popup) {
-                    return;
-                }
-                popup.document.title = 'Babylon.js INSPECTOR';
-                // Get the inspector style      
-                var styles = Inspector.DOCUMENT.querySelectorAll('style');
-                for (var s = 0; s < styles.length; s++) {
-                    popup.document.body.appendChild(styles[s].cloneNode(true));
-                }
-                var links = document.querySelectorAll('link');
-                for (var l = 0; l < links.length; l++) {
-                    var link = popup.document.createElement("link");
-                    link.rel = "stylesheet";
-                    link.href = links[l].href;
-                    popup.document.head.appendChild(link);
-                }
-                // Dispose the right panel if existing
-                if (!firstTime) {
-                    this.dispose();
-                }
-                // set the mode as popup
-                this._popupMode = true;
-                // Save the HTML document
-                Inspector.DOCUMENT = popup.document;
-                Inspector.WINDOW = popup;
-                // Build the inspector wrapper
-                this._c2diwrapper = INSPECTOR.Helpers.CreateDiv('insp-wrapper', popup.document.body);
-                // add inspector     
-                var inspector = INSPECTOR.Helpers.CreateDiv('insp-right-panel', this._c2diwrapper);
-                inspector.classList.add('popupmode');
-                // and build it in the popup  
-                this._buildInspector(inspector);
-                // Rebuild it
-                this.refresh();
-                popup.addEventListener('resize', function () {
-                    if (_this._tabbar) {
-                        _this._tabbar.updateWidth();
-                    }
-                });
+            popup.document.title = "Babylon.js INSPECTOR";
+            // Get the inspector style      
+            var styles = Inspector.DOCUMENT.querySelectorAll('style');
+            for (var s = 0; s < styles.length; s++) {
+                popup.document.body.appendChild(styles[s].cloneNode(true));
             }
+            var links = document.querySelectorAll('link');
+            for (var l = 0; l < links.length; l++) {
+                var link = popup.document.createElement("link");
+                link.rel = "stylesheet";
+                link.href = links[l].href;
+                popup.document.head.appendChild(link);
+            }
+            // Dispose the right panel if existing
+            if (!firstTime) {
+                this.dispose();
+            }
+            // set the mode as popup
+            this._popupMode = true;
+            // Save the HTML document
+            Inspector.DOCUMENT = popup.document;
+            Inspector.WINDOW = popup;
+            // Build the inspector wrapper
+            this._c2diwrapper = INSPECTOR.Helpers.CreateDiv('insp-wrapper', popup.document.body);
+            // add inspector     
+            var inspector = INSPECTOR.Helpers.CreateDiv('insp-right-panel', this._c2diwrapper);
+            inspector.classList.add('popupmode');
+            // and build it in the popup  
+            this._buildInspector(inspector);
+            // Rebuild it
+            this.refresh();
+            popup.addEventListener('resize', function () {
+                if (_this._tabbar) {
+                    _this._tabbar.updateWidth();
+                }
+            });
         };
         Inspector.prototype.getActiveTabIndex = function () {
             return this._tabbar.getActiveTabIndex();
@@ -1362,9 +1362,10 @@ var INSPECTOR;
      * A property is a link between a data (string) and an object.
      */
     var Property = /** @class */ (function () {
-        function Property(prop, obj) {
+        function Property(prop, obj, parentObj) {
             this._property = prop;
             this._obj = obj;
+            this._parentObj = parentObj || null;
         }
         Object.defineProperty(Property.prototype, "name", {
             get: function () {
@@ -1378,6 +1379,45 @@ var INSPECTOR;
                 return this._obj[this._property];
             },
             set: function (newValue) {
+                if (newValue != undefined && this._obj[this._property] != undefined) {
+                    if (this._obj instanceof BABYLON.Scene) {
+                        this._obj.debugLayer.onPropertyChangedObservable.notifyObservers({
+                            object: this._obj,
+                            property: this._property,
+                            value: newValue,
+                            initialValue: this._obj[this._property]
+                        });
+                    }
+                    else {
+                        if (this._parentObj != null) {
+                            // Object that have "children" properties : Color, Vector, imageProcessingConfiguration
+                            if (this._parentObj instanceof BABYLON.Scene) {
+                                this._parentObj.debugLayer.onPropertyChangedObservable.notifyObservers({
+                                    object: this._parentObj,
+                                    property: this._property,
+                                    value: newValue,
+                                    initialValue: this._obj[this._property]
+                                });
+                            }
+                            else {
+                                this._parentObj.getScene().debugLayer.onPropertyChangedObservable.notifyObservers({
+                                    object: this._parentObj,
+                                    property: this._property,
+                                    value: newValue,
+                                    initialValue: this._obj[this._property]
+                                });
+                            }
+                        }
+                        else {
+                            this._obj.getScene().debugLayer.onPropertyChangedObservable.notifyObservers({
+                                object: this._obj,
+                                property: this._property,
+                                value: newValue,
+                                initialValue: this._obj[this._property]
+                            });
+                        }
+                    }
+                }
                 this._obj[this._property] = newValue;
             },
             enumerable: true,
@@ -1515,8 +1555,7 @@ var INSPECTOR;
                 e.preventDefault();
                 this.validateInput(this._input.value);
             }
-            else if (e.keyCode == 27) {
-                // Esc : remove input
+            else if (e.keyCode == 27) { // Esc : remove input
                 this.update();
             }
         };
@@ -1664,11 +1703,9 @@ var INSPECTOR;
          * Dispose all viewer element (color, texture...)
          */
         PropertyLine.prototype.dispose = function () {
-            // console.log('delete properties', this.name);
             INSPECTOR.Scheduler.getInstance().remove(this);
             for (var _i = 0, _a = this._children; _i < _a.length; _i++) {
                 var child = _a[_i];
-                // console.log('delete properties', child.name);
                 INSPECTOR.Scheduler.getInstance().remove(child);
             }
             for (var _b = 0, _c = this._elements; _b < _c.length; _b++) {
@@ -1825,20 +1862,20 @@ var INSPECTOR;
                     }
                     for (var _b = 0, propToDisplay_1 = propToDisplay; _b < propToDisplay_1.length; _b++) {
                         var prop = propToDisplay_1[_b];
-                        var infos = new INSPECTOR.Property(prop, this._property.value);
+                        var infos = new INSPECTOR.Property(prop, this._property.value, this._property.obj);
                         var child = new PropertyLine(infos, this, this._level + PropertyLine._MARGIN_LEFT);
                         this._children.push(child);
                     }
                     //Add the Hexa converter
                     if ((propToDisplay.indexOf('r') && propToDisplay.indexOf('g') && propToDisplay.indexOf('b') && propToDisplay.indexOf('a')) == 0) {
                         var hexLineInfos = [];
-                        var hexLinePropCheck = new INSPECTOR.Property("hexEnable", this._property.value);
+                        var hexLinePropCheck = new INSPECTOR.Property("hexEnable", this._property.value, this._property.obj);
                         hexLinePropCheck.value = false;
                         var hexLineCheck = new PropertyLine(hexLinePropCheck, this, this._level + PropertyLine._MARGIN_LEFT);
                         this._children.unshift(hexLineCheck);
                         for (var _c = 0, propToDisplay_2 = propToDisplay; _c < propToDisplay_2.length; _c++) {
                             var prop = propToDisplay_2[_c];
-                            var infos = new INSPECTOR.Property(prop, this._property.value);
+                            var infos = new INSPECTOR.Property(prop, this._property.value, this._property.obj);
                             var valHex = ((infos.value * 255) | 0).toString(16);
                             hexLineInfos.push(valHex);
                             if (valHex == "0") {
@@ -1848,7 +1885,7 @@ var INSPECTOR;
                         hexLineInfos.push("#");
                         hexLineInfos.reverse();
                         var hexLineString = hexLineInfos.join("");
-                        var hexLineProp = new INSPECTOR.Property("hex", this._property.value);
+                        var hexLineProp = new INSPECTOR.Property("hex", this._property.value, this._property.obj);
                         hexLineProp.value = hexLineString;
                         var hexLine = new PropertyLine(hexLineProp, this, this._level + PropertyLine._MARGIN_LEFT);
                         this._children.unshift(hexLine);
@@ -2424,7 +2461,6 @@ var INSPECTOR;
          * Returns true if the user browser is edge.
          */
         Helpers.IsBrowserEdge = function () {
-            //Detect if we are running on a faulty buggy OS.
             var regexp = /Edge/;
             return regexp.test(navigator.userAgent);
         };
@@ -2432,7 +2468,6 @@ var INSPECTOR;
          * Returns true if the user browser is IE.
          */
         Helpers.IsBrowserIE = function () {
-            //Detect if we are running on a faulty buggy OS.
             var regexp = /Trident.*rv\:11\./;
             return regexp.test(navigator.userAgent);
         };
@@ -2543,10 +2578,10 @@ var INSPECTOR;
                         style.textContent = elem;
                     });
                 }, undefined, undefined, undefined, function () {
-                    console.log("erreur");
+                    console.log('Error : LoadFile "glsl.min.js"');
                 });
             }, undefined, undefined, undefined, function () {
-                console.log("erreur");
+                console.log('Error : LoadFile "highlight.min.js"');
             });
         };
         Helpers.IsSystemName = function (name) {
@@ -3622,9 +3657,9 @@ var INSPECTOR;
         };
         ConsoleTab.prototype._message = function (type, message, caller) {
             var callerLine = INSPECTOR.Helpers.CreateDiv('caller', this._consolePanelContent);
-            callerLine.textContent = caller;
+            callerLine.textContent = caller.replace(' ', '\u00A0');
             var line = INSPECTOR.Helpers.CreateDiv(type, this._consolePanelContent);
-            line.textContent += message;
+            line.textContent = message.replace(' ', '\u00A0');
             this._consolePanelContent.scrollTop = this._consolePanelContent.scrollHeight;
         };
         ConsoleTab.prototype._addConsoleLog = function () {
@@ -4048,7 +4083,7 @@ var INSPECTOR;
     INSPECTOR.StatsTab = StatsTab;
 })(INSPECTOR || (INSPECTOR = {}));
 
-/// <reference path="../../../dist/preview release/gltf2Interface/babylon.glTF2Interface.d.ts"/>
+/// <reference path="../../../dist/preview release/glTF2Interface/babylon.glTF2Interface.d.ts"/>
 /// <reference path="../../../dist/preview release/loaders/babylon.glTF2FileLoader.d.ts"/>
 /// <reference path="../../../dist/preview release/serializers/babylon.glTF2Serializer.d.ts"/>
 var __extends = (this && this.__extends) || (function () {
@@ -4063,7 +4098,6 @@ var __extends = (this && this.__extends) || (function () {
 })();
 var INSPECTOR;
 (function (INSPECTOR) {
-    ;
     var GLTFTab = /** @class */ (function (_super) {
         __extends(GLTFTab, _super);
         function GLTFTab(tabbar, inspector) {
@@ -4075,20 +4109,36 @@ var INSPECTOR;
             _this._actions.addEventListener('click', function (event) {
                 _this._closeDetailsPanel();
             });
-            _this._addImport();
-            _this._addExport();
+            if (BABYLON.SceneLoader && BABYLON.GLTFFileLoader && BABYLON.GLTF2.GLTFLoader) {
+                _this._addImport();
+            }
+            if (BABYLON.GLTF2Export) {
+                _this._addExport();
+            }
             return _this;
         }
+        Object.defineProperty(GLTFTab, "IsSupported", {
+            get: function () {
+                return !!(BABYLON.SceneLoader && BABYLON.GLTFFileLoader && BABYLON.GLTF2.GLTFLoader) || !!BABYLON.GLTF2Export;
+            },
+            enumerable: true,
+            configurable: true
+        });
         /** @hidden */
         GLTFTab._Initialize = function () {
-            // Must register with OnPluginActivatedObservable as early as possible to
-            // override the default settings for each extension.
+            // Must register with OnPluginActivatedObservable as early as possible to override the loader defaults.
             BABYLON.SceneLoader.OnPluginActivatedObservable.add(function (loader) {
-                if (loader.name === "gltf" && GLTFTab._LoaderExtensionSettings) {
+                if (loader.name === "gltf" && GLTFTab._LoaderDefaults) {
+                    var defaults_1 = GLTFTab._LoaderDefaults;
+                    for (var key in defaults_1) {
+                        if (key !== "extensions") {
+                            loader[key] = GLTFTab._LoaderDefaults[key];
+                        }
+                    }
                     loader.onExtensionLoadedObservable.add(function (extension) {
-                        var settings = GLTFTab._LoaderExtensionSettings[extension.name];
-                        for (var settingName in settings) {
-                            extension[settingName] = settings[settingName];
+                        var extensionDefaults = defaults_1.extensions[extension.name];
+                        for (var key in extensionDefaults) {
+                            extension[key] = extensionDefaults[key];
                         }
                     });
                 }
@@ -4101,69 +4151,83 @@ var INSPECTOR;
         };
         GLTFTab.prototype._addImport = function () {
             var _this = this;
-            var importActions = INSPECTOR.Helpers.CreateDiv(null, this._actions);
-            this._getLoaderExtensionOverridesAsync().then(function (loaderExtensionSettings) {
-                var title = INSPECTOR.Helpers.CreateDiv('gltf-title', importActions);
-                title.textContent = 'Import';
-                var extensionActions = INSPECTOR.Helpers.CreateDiv('gltf-actions', importActions);
-                var extensionsTitle = INSPECTOR.Helpers.CreateDiv('gltf-title', extensionActions);
+            var importTitle = INSPECTOR.Helpers.CreateDiv('gltf-title', this._actions);
+            importTitle.textContent = 'Import';
+            var importActions = INSPECTOR.Helpers.CreateDiv('gltf-actions', this._actions);
+            this._getLoaderDefaultsAsync().then(function (defaults) {
+                importTitle.addEventListener('click', function (event) {
+                    _this._showLoaderDefaults(defaults);
+                    event.stopPropagation();
+                });
+                importActions.addEventListener('click', function (event) {
+                    _this._showLoaderDefaults(defaults);
+                    event.stopPropagation();
+                });
+                var extensionsTitle = INSPECTOR.Helpers.CreateDiv('gltf-title', importActions);
                 extensionsTitle.textContent = "Extensions";
                 var _loop_1 = function (extensionName) {
-                    var settings = loaderExtensionSettings[extensionName];
-                    var extensionAction = INSPECTOR.Helpers.CreateDiv('gltf-action', extensionActions);
+                    var extensionDefaults = defaults.extensions[extensionName];
+                    var extensionAction = INSPECTOR.Helpers.CreateDiv('gltf-action', importActions);
                     extensionAction.addEventListener('click', function (event) {
-                        if (_this._updateLoaderExtensionDetails(settings)) {
+                        if (_this._showLoaderExtensionDefaults(extensionDefaults)) {
                             event.stopPropagation();
                         }
                     });
                     var checkbox = INSPECTOR.Helpers.CreateElement('span', 'gltf-checkbox', extensionAction);
-                    if (settings.enabled) {
+                    if (extensionDefaults.enabled) {
                         checkbox.classList.add('action', 'active');
                     }
                     checkbox.addEventListener('click', function () {
                         checkbox.classList.toggle('active');
-                        settings.enabled = checkbox.classList.contains('active');
+                        extensionDefaults.enabled = checkbox.classList.contains('active');
                     });
                     var label = INSPECTOR.Helpers.CreateElement('span', null, extensionAction);
                     label.textContent = extensionName;
                 };
-                for (var extensionName in loaderExtensionSettings) {
+                for (var extensionName in defaults.extensions) {
                     _loop_1(extensionName);
                 }
             });
         };
-        GLTFTab.prototype._getLoaderExtensionOverridesAsync = function () {
-            if (GLTFTab._LoaderExtensionSettings) {
-                return Promise.resolve(GLTFTab._LoaderExtensionSettings);
-            }
-            var loaderExtensionSettings = {};
-            var engine = new BABYLON.NullEngine();
-            var scene = new BABYLON.Scene(engine);
-            var loader = new BABYLON.GLTF2.GLTFLoader();
-            loader.onExtensionLoadedObservable.add(function (extension) {
-                loaderExtensionSettings[extension.name] = {};
-                var settings = loaderExtensionSettings[extension.name];
-                for (var _i = 0, _a = Object.keys(extension); _i < _a.length; _i++) {
-                    var key = _a[_i];
-                    if (key !== "name" && key[0] !== '_') {
-                        var value = extension[key];
-                        if (typeof value !== "object") {
-                            settings[key] = value;
-                        }
+        GLTFTab._EnumeratePublic = function (obj, callback) {
+            for (var key in obj) {
+                if (key !== "name" && key[0] !== '_') {
+                    var value = obj[key];
+                    var type = typeof value;
+                    if (type !== "object" && type !== "function" && type !== "undefined") {
+                        callback(key, value);
                     }
                 }
+            }
+        };
+        GLTFTab.prototype._getLoaderDefaultsAsync = function () {
+            if (GLTFTab._LoaderDefaults) {
+                return Promise.resolve(GLTFTab._LoaderDefaults);
+            }
+            var defaults = {
+                extensions: {}
+            };
+            var engine = new BABYLON.NullEngine();
+            var scene = new BABYLON.Scene(engine);
+            var loader = new BABYLON.GLTFFileLoader();
+            GLTFTab._EnumeratePublic(loader, function (key, value) {
+                defaults[key] = value;
             });
-            var data = { json: {}, bin: null };
+            loader.onExtensionLoadedObservable.add(function (extension) {
+                var extensionDefaults = {};
+                GLTFTab._EnumeratePublic(extension, function (key, value) {
+                    extensionDefaults[key] = value;
+                });
+                defaults.extensions[extension.name] = extensionDefaults;
+            });
+            var data = '{ "asset": { "version": "2.0" } }';
             return loader.importMeshAsync([], scene, data, "").then(function () {
                 scene.dispose();
                 engine.dispose();
-                return (GLTFTab._LoaderExtensionSettings = loaderExtensionSettings);
+                return (GLTFTab._LoaderDefaults = defaults);
             });
         };
-        GLTFTab.prototype._updateLoaderExtensionDetails = function (settings) {
-            if (Object.keys(settings).length === 1) {
-                return false;
-            }
+        GLTFTab.prototype._openDetailsPanel = function () {
             if (!this._detailsPanel) {
                 this._detailsPanel = new INSPECTOR.DetailPanel();
                 this._panel.appendChild(this._detailsPanel.toHtml());
@@ -4174,14 +4238,7 @@ var INSPECTOR;
                 });
             }
             this._detailsPanel.clean();
-            var details = new Array();
-            for (var key in settings) {
-                if (key !== "enabled") {
-                    details.push(new INSPECTOR.PropertyLine(new INSPECTOR.Property(key, settings)));
-                }
-            }
-            this._detailsPanel.details = details;
-            return true;
+            return this._detailsPanel;
         };
         GLTFTab.prototype._closeDetailsPanel = function () {
             if (this._detailsPanel) {
@@ -4194,11 +4251,35 @@ var INSPECTOR;
                 delete this._split;
             }
         };
+        GLTFTab.prototype._showLoaderDefaults = function (defaults) {
+            var detailsPanel = this._openDetailsPanel();
+            var details = new Array();
+            for (var key in defaults) {
+                if (key !== "extensions") {
+                    details.push(new INSPECTOR.PropertyLine(new INSPECTOR.Property(key, defaults, this._inspector.scene)));
+                }
+            }
+            detailsPanel.details = details;
+        };
+        GLTFTab.prototype._showLoaderExtensionDefaults = function (defaults) {
+            if (Object.keys(defaults).length === 1) {
+                return false;
+            }
+            var detailsPanel = this._openDetailsPanel();
+            var details = new Array();
+            for (var key in defaults) {
+                if (key !== "enabled") {
+                    details.push(new INSPECTOR.PropertyLine(new INSPECTOR.Property(key, defaults, this._inspector.scene)));
+                }
+            }
+            detailsPanel.details = details;
+            return true;
+        };
         GLTFTab.prototype._addExport = function () {
             var _this = this;
-            var exportActions = INSPECTOR.Helpers.CreateDiv(null, this._actions);
-            var title = INSPECTOR.Helpers.CreateDiv('gltf-title', exportActions);
-            title.textContent = 'Export';
+            var exportTitle = INSPECTOR.Helpers.CreateDiv('gltf-title', this._actions);
+            exportTitle.textContent = 'Export';
+            var exportActions = INSPECTOR.Helpers.CreateDiv('gltf-actions', this._actions);
             var name = INSPECTOR.Helpers.CreateInput('gltf-input', exportActions);
             name.placeholder = "File name...";
             var button = INSPECTOR.Helpers.CreateElement('button', 'gltf-button', exportActions);
@@ -4223,11 +4304,144 @@ var INSPECTOR;
             }
             return false;
         };
-        GLTFTab._LoaderExtensionSettings = null;
+        GLTFTab._LoaderDefaults = null;
         return GLTFTab;
     }(INSPECTOR.Tab));
     INSPECTOR.GLTFTab = GLTFTab;
     GLTFTab._Initialize();
+})(INSPECTOR || (INSPECTOR = {}));
+
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+var INSPECTOR;
+(function (INSPECTOR) {
+    var ToolsTab = /** @class */ (function (_super) {
+        __extends(ToolsTab, _super);
+        function ToolsTab(tabbar, insp) {
+            var _this = _super.call(this, tabbar, 'Tools') || this;
+            _this._inspector = insp;
+            _this._scene = _this._inspector.scene;
+            // Build the tools panel: a div that will contains all tools
+            _this._panel = INSPECTOR.Helpers.CreateDiv('tab-panel');
+            _this._panel.classList.add("tools-panel");
+            var title = INSPECTOR.Helpers.CreateDiv('tool-title1', _this._panel);
+            var versionSpan = INSPECTOR.Helpers.CreateElement('span');
+            versionSpan.textContent = "Babylon.js v" + BABYLON.Engine.Version + " - Tools";
+            title.appendChild(versionSpan);
+            // Environment block
+            title = INSPECTOR.Helpers.CreateDiv('tool-title2', _this._panel);
+            title.textContent = "Environment Texture (.dds, .env)";
+            {
+                var errorElemm_1 = INSPECTOR.Inspector.DOCUMENT.createElement('div');
+                errorElemm_1.className = "tool-label-error";
+                errorElemm_1.style.display = "none";
+                var elemValue = INSPECTOR.Helpers.CreateDiv(null, _this._panel);
+                var inputElement = INSPECTOR.Inspector.DOCUMENT.createElement('input');
+                inputElement.className = "tool-input";
+                inputElement.type = "file";
+                inputElement.accept = ".dds, .env";
+                inputElement.onchange = function (event) {
+                    var files = event.target.files;
+                    var file = null;
+                    if (files && files.length) {
+                        file = files[0];
+                    }
+                    if (!file) {
+                        errorElemm_1.style.display = "block";
+                        errorElemm_1.textContent = "Please, select a file first.";
+                        return;
+                    }
+                    var isFileDDS = file.name.toLowerCase().indexOf(".dds") > 0;
+                    var isFileEnv = file.name.toLowerCase().indexOf(".env") > 0;
+                    if (!isFileDDS && !isFileEnv) {
+                        errorElemm_1.style.display = "block";
+                        errorElemm_1.textContent = "Please, select a dds or env file.";
+                        return;
+                    }
+                    BABYLON.Tools.ReadFile(file, function (data) {
+                        var blob = new Blob([data], { type: "octet/stream" });
+                        var url = URL.createObjectURL(blob);
+                        if (isFileDDS) {
+                            _this._scene.environmentTexture = BABYLON.CubeTexture.CreateFromPrefilteredData(url, _this._scene, ".dds");
+                            errorElemm_1.style.display = "none";
+                        }
+                        else {
+                            _this._scene.environmentTexture = new BABYLON.CubeTexture(url, _this._scene, undefined, undefined, undefined, function () {
+                                errorElemm_1.style.display = "none";
+                            }, function (message) {
+                                if (message) {
+                                    errorElemm_1.style.display = "block";
+                                    errorElemm_1.textContent = message;
+                                }
+                            }, undefined, undefined, ".env");
+                        }
+                    }, undefined, true);
+                };
+                elemValue.appendChild(inputElement);
+                if (!_this._scene.getEngine().premultipliedAlpha) {
+                    elemValue = INSPECTOR.Helpers.CreateDiv(null, _this._panel);
+                    inputElement = INSPECTOR.Inspector.DOCUMENT.createElement('input');
+                    inputElement.value = "Compress current texture to .env";
+                    inputElement.className = "tool-input";
+                    inputElement.type = "button";
+                    inputElement.onclick = function () {
+                        if (!_this._scene.environmentTexture) {
+                            errorElemm_1.style.display = "block";
+                            errorElemm_1.textContent = "You must load an environment texture first.";
+                            return;
+                        }
+                        if (_this._scene.activeCamera) {
+                            BABYLON.EnvironmentTextureTools.CreateEnvTextureAsync(_this._scene.environmentTexture)
+                                .then(function (buffer) {
+                                var blob = new Blob([buffer], { type: "octet/stream" });
+                                BABYLON.Tools.Download(blob, "environment.env");
+                                errorElemm_1.style.display = "none";
+                            })
+                                .catch(function (error) {
+                                errorElemm_1.style.display = "block";
+                                errorElemm_1.textContent = error;
+                            });
+                        }
+                        else {
+                            errorElemm_1.style.display = "block";
+                            errorElemm_1.textContent = "An active camera is required.";
+                        }
+                    };
+                    elemValue.appendChild(inputElement);
+                }
+                _this._panel.appendChild(errorElemm_1);
+            }
+            title = INSPECTOR.Helpers.CreateDiv('tool-title2', _this._panel);
+            title.textContent = "Capture";
+            {
+                var elemValue = INSPECTOR.Helpers.CreateDiv(null, _this._panel);
+                var inputElement = INSPECTOR.Inspector.DOCUMENT.createElement('input');
+                inputElement.value = "Take Screenshot";
+                inputElement.type = "button";
+                inputElement.className = "tool-input";
+                inputElement.onclick = function () {
+                    if (_this._scene.activeCamera) {
+                        BABYLON.Tools.CreateScreenshot(_this._scene.getEngine(), _this._scene.activeCamera, { precision: 0.5 });
+                    }
+                };
+                elemValue.appendChild(inputElement);
+            }
+            return _this;
+        }
+        ToolsTab.prototype.dispose = function () {
+            // Nothing to dispose
+        };
+        return ToolsTab;
+    }(INSPECTOR.Tab));
+    INSPECTOR.ToolsTab = ToolsTab;
 })(INSPECTOR || (INSPECTOR = {}));
 
 var __extends = (this && this.__extends) || (function () {
@@ -4265,7 +4479,7 @@ var INSPECTOR;
             _this._tabs.push(_this._meshTab);
             _this._tabs.push(new INSPECTOR.LightTab(_this, _this._inspector));
             _this._tabs.push(new INSPECTOR.MaterialTab(_this, _this._inspector));
-            if (BABYLON.GLTF2Export) {
+            if (INSPECTOR.GLTFTab.IsSupported) {
                 _this._tabs.push(new INSPECTOR.GLTFTab(_this, _this._inspector));
             }
             if (BABYLON.GUI) {
@@ -4274,6 +4488,7 @@ var INSPECTOR;
             _this._tabs.push(new INSPECTOR.PhysicsTab(_this, _this._inspector));
             _this._tabs.push(new INSPECTOR.CameraTab(_this, _this._inspector));
             _this._tabs.push(new INSPECTOR.SoundTab(_this, _this._inspector));
+            _this._tabs.push(new INSPECTOR.ToolsTab(_this, _this._inspector));
             _this._toolBar = new INSPECTOR.Toolbar(_this._inspector);
             _this._build();
             //Check initialTab is defined and between tabs bounds
@@ -4457,11 +4672,11 @@ var INSPECTOR;
 var INSPECTOR;
 (function (INSPECTOR) {
     var AbstractTool = /** @class */ (function () {
-        function AbstractTool(icon, parent, inspector, tooltip) {
+        function AbstractTool(iconSet, icon, parent, inspector, tooltip) {
             var _this = this;
             this._inspector = inspector;
             this._elem = INSPECTOR.Inspector.DOCUMENT.createElement('i');
-            this._elem.className = "tool fa " + icon;
+            this._elem.className = "tool " + iconSet + " " + icon;
             parent.appendChild(this._elem);
             this._elem.addEventListener('click', function (e) {
                 _this.action();
@@ -4509,7 +4724,7 @@ var INSPECTOR;
     var PauseScheduleTool = /** @class */ (function (_super) {
         __extends(PauseScheduleTool, _super);
         function PauseScheduleTool(parent, inspector) {
-            var _this = _super.call(this, 'fa-pause', parent, inspector, 'Pause the automatic update of properties') || this;
+            var _this = _super.call(this, 'fa', 'fa-pause', parent, inspector, 'Pause the automatic update of properties') || this;
             _this._isPause = false;
             return _this;
         }
@@ -4545,7 +4760,7 @@ var INSPECTOR;
     var PickTool = /** @class */ (function (_super) {
         __extends(PickTool, _super);
         function PickTool(parent, inspector) {
-            var _this = _super.call(this, 'fa-mouse-pointer', parent, inspector, 'Select a mesh in the scene') || this;
+            var _this = _super.call(this, 'fa', 'fa-mouse-pointer', parent, inspector, 'Select a mesh in the scene') || this;
             _this._isActive = false;
             // Create handler
             _this._pickHandler = _this._pickMesh.bind(_this);
@@ -4608,7 +4823,7 @@ var INSPECTOR;
     var PopupTool = /** @class */ (function (_super) {
         __extends(PopupTool, _super);
         function PopupTool(parent, inspector) {
-            return _super.call(this, 'fa-external-link', parent, inspector, 'Open the inspector in a popup') || this;
+            return _super.call(this, 'fas', 'fa-external-link-alt', parent, inspector, 'Open the inspector in a popup') || this;
         }
         // Action : refresh the whole panel
         PopupTool.prototype.action = function () {
@@ -4634,7 +4849,7 @@ var INSPECTOR;
     var RefreshTool = /** @class */ (function (_super) {
         __extends(RefreshTool, _super);
         function RefreshTool(parent, inspector) {
-            return _super.call(this, 'fa-refresh', parent, inspector, 'Refresh the current tab') || this;
+            return _super.call(this, 'fa', 'fa-sync', parent, inspector, 'Refresh the current tab') || this;
         }
         // Action : refresh the whole panel
         RefreshTool.prototype.action = function () {
@@ -4660,7 +4875,7 @@ var INSPECTOR;
     var LabelTool = /** @class */ (function (_super) {
         __extends(LabelTool, _super);
         function LabelTool(parent, inspector) {
-            var _this = _super.call(this, 'fa-tags', parent, inspector, 'Display mesh names on the canvas') || this;
+            var _this = _super.call(this, 'fa', 'fa-tags', parent, inspector, 'Display mesh names on the canvas') || this;
             /** True if label are displayed, false otherwise */
             _this._isDisplayed = false;
             _this._advancedTexture = null;
@@ -4849,7 +5064,7 @@ var INSPECTOR;
     var DisposeTool = /** @class */ (function (_super) {
         __extends(DisposeTool, _super);
         function DisposeTool(parent, inspector) {
-            return _super.call(this, 'fa-times', parent, inspector, 'Close the inspector panel') || this;
+            return _super.call(this, 'fa', 'fa-times', parent, inspector, 'Close the inspector panel') || this;
         }
         // Action : refresh the whole panel
         DisposeTool.prototype.action = function () {
@@ -4875,7 +5090,7 @@ var INSPECTOR;
     var FullscreenTool = /** @class */ (function (_super) {
         __extends(FullscreenTool, _super);
         function FullscreenTool(parent, inspector) {
-            return _super.call(this, 'fa-expand', parent, inspector, 'Open the scene in fullscreen, press Esc to exit') || this;
+            return _super.call(this, 'fa', 'fa-expand', parent, inspector, 'Open the scene in fullscreen, press Esc to exit') || this;
         }
         // Action : refresh the whole panel
         FullscreenTool.prototype.action = function () {
@@ -5129,7 +5344,7 @@ var INSPECTOR;
         function BoundingBox(obj) {
             var _this = _super.call(this) || this;
             _this._obj = obj;
-            _this._elem.classList.add('fa-square-o');
+            _this._elem.classList.add('fa-cube');
             _this._on = _this._obj.isBoxVisible();
             _this._check();
             return _this;

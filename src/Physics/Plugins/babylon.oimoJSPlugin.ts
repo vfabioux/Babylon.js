@@ -122,12 +122,15 @@ module BABYLON {
                     return Math.max(value, PhysicsEngine.Epsilon);
                 }
 
+                let globalQuaternion: Quaternion = new Quaternion();
+
                 impostors.forEach((i) => {
                     if (!i.object.rotationQuaternion) {
                         return;
                     }
                     //get the correct bounding box
                     var oldQuaternion = i.object.rotationQuaternion;
+                    globalQuaternion = oldQuaternion.clone();
 
                     var rot = oldQuaternion.toEulerAngles();
                     var extendSize = i.getObjectExtendSize();
@@ -147,9 +150,9 @@ module BABYLON {
                         bodyConfig.posShape.push(0, 0, 0);
 
                         //tmp solution
-                        bodyConfig.rot.push(rot.x * radToDeg);
-                        bodyConfig.rot.push(rot.y * radToDeg);
-                        bodyConfig.rot.push(rot.z * radToDeg);
+                        bodyConfig.rot.push(0);
+                        bodyConfig.rot.push(0);
+                        bodyConfig.rot.push(0);
                         bodyConfig.rotShape.push(0, 0, 0);
                     } else {
                         let localPosition = i.object.getAbsolutePosition().subtract(impostor.object.getAbsolutePosition());
@@ -222,6 +225,10 @@ module BABYLON {
                 });
 
                 impostor.physicsBody = this.world.add(bodyConfig);
+                // set the quaternion, ignoring the previously defined (euler) rotation
+                impostor.physicsBody.resetQuaternion(globalQuaternion);
+                // update with delta 0, so the body will reveive the new rotation.
+                impostor.physicsBody.updatePosition(0);
 
             } else {
                 this._tmpPositionVector.copyFromFloats(0, 0, 0);
@@ -351,11 +358,11 @@ module BABYLON {
         }*/
 
         public setLinearVelocity(impostor: PhysicsImpostor, velocity: Vector3) {
-            impostor.physicsBody.linearVelocity.init(velocity.x, velocity.y, velocity.z);
+            impostor.physicsBody.linearVelocity.copy(velocity);
         }
 
         public setAngularVelocity(impostor: PhysicsImpostor, velocity: Vector3) {
-            impostor.physicsBody.angularVelocity.init(velocity.x, velocity.y, velocity.z);
+            impostor.physicsBody.angularVelocity.copy(velocity);
         }
 
         public getLinearVelocity(impostor: PhysicsImpostor): Nullable<Vector3> {

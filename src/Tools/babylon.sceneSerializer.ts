@@ -65,17 +65,24 @@
         if (mesh.delayLoadState === Engine.DELAYLOADSTATE_LOADED || mesh.delayLoadState === Engine.DELAYLOADSTATE_NONE) {
             //serialize material
             if (mesh.material) {
-                if (mesh.material instanceof StandardMaterial) {
+                if (mesh.material instanceof MultiMaterial) {
+                    serializationObject.multiMaterials = serializationObject.multiMaterials || [];
+                    serializationObject.materials = serializationObject.materials || [];
+                    if (!serializationObject.multiMaterials.some((mat: Material) => (mat.id === (<Material>mesh.material).id))) {
+                        serializationObject.multiMaterials.push(mesh.material.serialize());
+                        for (let submaterial of mesh.material.subMaterials) {
+                            if (submaterial) {
+                                if (!serializationObject.materials.some((mat: Material) => (mat.id === (<Material>submaterial).id))) {
+                                    serializationObject.materials.push(submaterial.serialize());
+                                }
+                            }
+                        }
+                    }
+                } else {
                     serializationObject.materials = serializationObject.materials || [];
                     if (!serializationObject.materials.some((mat: Material) => (mat.id === (<Material>mesh.material).id))) {
                         serializationObject.materials.push(mesh.material.serialize());
                     }
-                } else if (mesh.material instanceof MultiMaterial) {
-                    serializationObject.multiMaterials = serializationObject.multiMaterials || [];
-                    if (!serializationObject.multiMaterials.some((mat: Material) => (mat.id === (<Material>mesh.material).id))) {
-                        serializationObject.multiMaterials.push(mesh.material.serialize());
-                    }
-
                 }
             }
             //serialize geometry
@@ -272,12 +279,6 @@
                 serializationObject.particleSystems.push(scene.particleSystems[index].serialize());
             }
 
-            // Lens flares
-            serializationObject.lensFlareSystems = [];
-            for (index = 0; index < scene.lensFlareSystems.length; index++) {
-                serializationObject.lensFlareSystems.push(scene.lensFlareSystems[index].serialize());
-            }
-
             // Shadows
             serializationObject.shadowGenerators = [];
             for (index = 0; index < scene.lights.length; index++) {
@@ -305,14 +306,9 @@
                 }
             }
 
-            // Effect layers
-            serializationObject.effectLayers = [];
-
-            for (index = 0; index < scene.effectLayers.length; index++) {
-                var layer = scene.effectLayers[index];
-                if (layer.serialize) {
-                    serializationObject.effectLayers.push(layer.serialize());
-                }
+            // Components
+            for (let component of scene._serializableComponents) {
+                component.serialize(serializationObject);
             }
 
             return serializationObject;

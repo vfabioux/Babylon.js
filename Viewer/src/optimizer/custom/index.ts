@@ -1,7 +1,7 @@
-import { AbstractViewer } from "../../viewer/viewer";
 import { extendedUpgrade, extendedDegrade } from "./extended";
+import { SceneManager } from "../../managers/sceneManager";
 
-const cache: { [key: string]: (viewer: AbstractViewer) => boolean } = {};
+const cache: { [key: string]: (sceneManager: SceneManager) => boolean } = {};
 
 /**
  * 
@@ -22,4 +22,8 @@ export function getCustomOptimizerByName(name: string, upgrade?: boolean) {
     }
 
     return cache[name];
+}
+
+export function registerCustomOptimizer(name: string, optimizer: (sceneManager: SceneManager) => boolean) {
+    cache[name] = optimizer;
 }

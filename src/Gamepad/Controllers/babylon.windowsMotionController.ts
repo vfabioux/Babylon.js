@@ -189,17 +189,21 @@ module BABYLON {
             return this.onTrackpadValuesChangedObservable;
         }
 
+        private _updateTrackpad(){
+            if (this.browserGamepad.axes && (this.browserGamepad.axes[2] != this.trackpad.x || this.browserGamepad.axes[3] != this.trackpad.y)) {
+                this.trackpad.x = this.browserGamepad["axes"][2];
+                this.trackpad.y = this.browserGamepad["axes"][3];
+                this.onTrackpadValuesChangedObservable.notifyObservers(this.trackpad);
+            }
+        }
+
         /**
          * Called once per frame by the engine.
          */
         public update() {
             super.update();
             if (this.browserGamepad.axes) {
-                if (this.browserGamepad.axes[2] != this.trackpad.x || this.browserGamepad.axes[3] != this.trackpad.y) {
-                    this.trackpad.x = this.browserGamepad["axes"][2];
-                    this.trackpad.y = this.browserGamepad["axes"][3];
-                    this.onTrackpadValuesChangedObservable.notifyObservers(this.trackpad);
-                }
+                this._updateTrackpad();
                 // Only need to animate axes if there is a loaded mesh
                 if (this._loadedMeshInfo) {
                     for (let axis = 0; axis < this._mapping.axisMeshNames.length; axis++) {
@@ -220,6 +224,9 @@ module BABYLON {
             if (!buttonName) {
                 return;
             }
+
+            // Update the trackpad to ensure trackpad.x/y are accurate during button events between frames
+            this._updateTrackpad();
 
             // Only emit events for buttons that we know how to map from index to name
             let observable = (<any>this)[(<any>(this._mapping.buttonObservableNames))[buttonName]];
@@ -341,14 +348,14 @@ module BABYLON {
 
                 if (meshLoaded) {
                     meshLoaded(this._defaultModel);
-                }
+                }                    
             }, null, (scene: Scene, message: string) => {
                 Tools.Log(message);
                 Tools.Warn('Failed to retrieve controller model from the remote server: ' + path + filename);
                 if (!forceDefault) {
                     this.initControllerMesh(scene, meshLoaded, true);
                 }
-            });
+            });            
         }
 
         /**
@@ -469,6 +476,8 @@ module BABYLON {
             loadedMeshInfo.pointingPoseNode = getChildByName(rootNode, this._mapping.pointingPoseMeshName);
             if (!loadedMeshInfo.pointingPoseNode) {
                 Tools.Warn('Missing pointing pose mesh with name: ' + this._mapping.pointingPoseMeshName);
+            }else{
+                this._pointingPoseNode = loadedMeshInfo.pointingPoseNode;
             }
 
             return loadedMeshInfo;

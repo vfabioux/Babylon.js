@@ -1,19 +1,22 @@
 
 
-import { ViewerConfiguration, IModelConfiguration, ILightConfiguration } from './../configuration/configuration';
-import { Template, EventCallback } from './../templateManager';
+import { ViewerConfiguration, IModelConfiguration, ILightConfiguration } from './../configuration';
+import { Template, EventCallback } from '../templating/templateManager';
 import { AbstractViewer } from './viewer';
-import { SpotLight, MirrorTexture, Plane, ShadowGenerator, Texture, BackgroundMaterial, Observable, ShadowLight, CubeTexture, BouncingBehavior, FramingBehavior, Behavior, Light, Engine, Scene, AutoRotationBehavior, AbstractMesh, Quaternion, StandardMaterial, ArcRotateCamera, ImageProcessingConfiguration, Color3, Vector3, SceneLoader, Mesh, HemisphericLight, FilesInput } from 'babylonjs';
-import { CameraBehavior } from '../interfaces';
+import { SpotLight, Vector3, FilesInput } from 'babylonjs';
 import { ViewerModel } from '../model/viewerModel';
-import { extendClassWithConfig } from '../helper';
 import { IModelAnimation, AnimationState } from '../model/modelAnimation';
+import { IViewerTemplatePlugin } from '../templating/viewerTemplatePlugin';
+import { HDButtonPlugin } from '../templating/plugins/hdButtonPlugin';
+import { PrintButtonPlugin } from '../templating/plugins/printButton';
 
 /**
  * The Default viewer is the default implementation of the AbstractViewer.
  * It uses the templating system to render a new canvas and controls.
  */
 export class DefaultViewer extends AbstractViewer {
+
+    public fullscreenElement?: HTMLElement;
 
     /**
      * Create a new default viewer
@@ -22,11 +25,53 @@ export class DefaultViewer extends AbstractViewer {
      */
     constructor(public containerElement: HTMLElement, initialConfiguration: ViewerConfiguration = { extends: 'default' }) {
         super(containerElement, initialConfiguration);
-        this.onModelLoadedObservable.add(this._onModelLoaded);
 
-        this.sceneManager.onLightsConfiguredObservable.add((data) => {
-            this._configureLights(data.newConfiguration, data.model!);
+        this.onModelLoadedObservable.add(this._onModelLoaded);
+        this.onModelRemovedObservable.add(() => {
+            this._configureTemplate();
         })
+
+        this.onEngineInitObservable.add(() => {
+            this.sceneManager.onLightsConfiguredObservable.add((data) => {
+                this._configureLights();
+            })
+        });
+
+        this.onInitDoneObservable.add(() => {
+            if (!this.sceneManager.models.length) {
+                this.hideLoadingScreen();
+            }
+        })
+    }
+
+    private _registeredPlugins: Array<IViewerTemplatePlugin> = [];
+
+    public registerTemplatePlugin(plugin: IViewerTemplatePlugin) {
+        //validate
+        if (!plugin.templateName) {
+            throw new Error("No template name provided");
+        }
+        this._registeredPlugins.push(plugin);
+        let template = this.templateManager.getTemplate(plugin.templateName);
+        if (!template) {
+            throw new Error(`Template ${plugin.templateName} not found`);
+        }
+        if (plugin.addHTMLTemplate) {
+            template.onHTMLRendered.add((tmpl) => {
+                plugin.addHTMLTemplate!(tmpl);
+            });
+            template.redraw();
+        }
+
+        if (plugin.eventsToAttach) {
+            plugin.eventsToAttach.forEach(eventName => {
+                plugin.onEvent && this.templateManager.eventManager.registerCallback(plugin.templateName, (event) => {
+                    if (plugin.onEvent && plugin.interactionPredicate(event)) {
+                        plugin.onEvent(event);
+                    }
+                }, eventName);
+            });
+        }
     }
 
     /**
@@ -39,34 +84,36 @@ export class DefaultViewer extends AbstractViewer {
         this._initNavbar();
 
         // close overlay button
-        let closeButton = document.getElementById('close-button');
-        if (closeButton) {
-            closeButton.addEventListener('pointerdown', () => {
-                this.hideOverlayScreen();
-            });
+        let template = this.templateManager.getTemplate('overlay');
+        if (template) {
+
+            let closeButton = template.parent.querySelector('.close-button');
+            if (closeButton) {
+                closeButton.addEventListener('pointerdown', () => {
+                    this.hideOverlayScreen();
+                });
+            }
         }
 
         if (this.configuration.templates && this.configuration.templates.viewer) {
             if (this.configuration.templates.viewer.params && this.configuration.templates.viewer.params.enableDragAndDrop) {
-                let filesInput = new FilesInput(this.engine, this.sceneManager.scene, () => {
-                }, () => {
-                }, () => {
-                }, () => {
-                }, function () {
-                }, (file: File) => {
-                    this.loadModel(file);
-                }, () => {
-                });
-                filesInput.monitorElementForDragNDrop(this.templateManager.getCanvas()!);
+                this.onSceneInitObservable.addOnce(() => {
+                    let filesInput = new FilesInput(this.engine, this.sceneManager.scene, () => {
+                    }, () => {
+                    }, () => {
+                    }, () => {
+                    }, function () {
+                    }, (file: File) => {
+                        this.loadModel(file);
+                    }, () => {
+                    });
+                    filesInput.monitorElementForDragNDrop(this.templateManager.getCanvas()!);
+                })
             }
         }
 
 
         return super._onTemplatesLoaded();
-    }
-
-    private _dropped(evt: EventCallback) {
-
     }
 
     private _initNavbar() {
@@ -77,7 +124,7 @@ export class DefaultViewer extends AbstractViewer {
             // an example how to trigger the help button. publiclly available
             this.templateManager.eventManager.registerCallback("navBar", () => {
                 // do your thing
-            }, "pointerdown", "#help-button");
+            }, "pointerdown", ".help-button");
 
             this.templateManager.eventManager.registerCallback("navBar", (event: EventCallback) => {
                 const evt = event.event;
@@ -88,12 +135,21 @@ export class DefaultViewer extends AbstractViewer {
                 this._currentAnimation.goToFrame(gotoFrame);
             }, "input");
 
-            this.templateManager.eventManager.registerCallback("navBar", (e) => {
+            this.templateManager.eventManager.registerCallback("navBar", () => {
                 if (this._resumePlay) {
                     this._togglePlayPause(true);
                 }
                 this._resumePlay = false;
-            }, "pointerup", "#progress-wrapper");
+            }, "pointerup", ".progress-wrapper");
+
+            if (window.devicePixelRatio === 1 && navbar.configuration.params && !navbar.configuration.params.hideHdButton) {
+                navbar.updateParams({
+                    hideHdButton: true
+                });
+            }
+
+            this.registerTemplatePlugin(new HDButtonPlugin(this));
+            this.registerTemplatePlugin(new PrintButtonPlugin(this));
         }
     }
 
@@ -114,7 +170,19 @@ export class DefaultViewer extends AbstractViewer {
 
         let parentClasses = element.parentElement!.classList;
 
-        switch (element.id) {
+        let elementClasses = element.classList;
+
+        let elementName = "";
+
+        for (let i = 0; i < elementClasses.length; ++i) {
+            let className = elementClasses[i];
+            if (className.indexOf("-button") !== -1 || className.indexOf("-wrapper") !== -1) {
+                elementName = className;
+                break;
+            }
+        }
+
+        switch (elementName) {
             case "speed-button":
             case "types-button":
                 if (parentClasses.contains("open")) {
@@ -127,9 +195,10 @@ export class DefaultViewer extends AbstractViewer {
                 this._togglePlayPause();
                 break;
             case "label-option-button":
-                var label = element.dataset["value"];
-                if (label) {
-                    this._updateAnimationType(label);
+                var value = element.dataset["value"];
+                var label = element.querySelector("span.animation-label");
+                if (label && value) {
+                    this._updateAnimationType({ value, label: label.innerHTML });
                 }
                 break;
             case "speed-option-button":
@@ -148,6 +217,10 @@ export class DefaultViewer extends AbstractViewer {
                 break;
             case "fullscreen-button":
                 this.toggleFullscreen();
+                break;
+            case "vr-button":
+                this.toggleVR();
+                break;
             default:
                 return;
         }
@@ -186,7 +259,7 @@ export class DefaultViewer extends AbstractViewer {
     private _updateProgressBar = () => {
         let navbar = this.templateManager.getTemplate('navBar');
         if (!navbar) return;
-        var progressSlider = <HTMLInputElement>navbar.parent.querySelector("input#progress-wrapper");
+        var progressSlider = <HTMLInputElement>navbar.parent.querySelector("input.progress-wrapper");
         if (progressSlider && this._currentAnimation) {
             const progress = this._currentAnimation.currentFrame / this._currentAnimation.frames * 100;
             var currentValue = progressSlider.valueAsNumber;
@@ -234,25 +307,40 @@ export class DefaultViewer extends AbstractViewer {
     /** 
      * Update Current Animation Type
      */
-    private _updateAnimationType = (label: string, paramsObject?: any) => {
+    private _updateAnimationType = (data: { label: string, value: string }, paramsObject?: any) => {
         let navbar = this.templateManager.getTemplate('navBar');
         if (!navbar) return;
 
-        if (label) {
-            this._currentAnimation = this.sceneManager.models[0].setCurrentAnimationByName(label);
+        if (data) {
+            this._currentAnimation = this.sceneManager.models[0].setCurrentAnimationByName(data.value);
         }
 
         if (paramsObject) {
-            paramsObject.selectedAnimation = (this._animationList.indexOf(label) + 1);
-            paramsObject.selectedAnimationName = label;
+            paramsObject.selectedAnimation = (this._animationList.indexOf(data.value) + 1);
+            paramsObject.selectedAnimationName = data.label;
         } else {
             navbar.updateParams({
-                selectedAnimation: (this._animationList.indexOf(label) + 1),
-                selectedAnimationName: label
+                selectedAnimation: (this._animationList.indexOf(data.value) + 1),
+                selectedAnimationName: data.label
             });
         }
 
         this._updateAnimationSpeed("1.0", paramsObject);
+    }
+
+    public toggleVR() {
+        super.toggleVR();
+
+        let viewerTemplate = this.templateManager.getTemplate('viewer');
+        let viewerElement = viewerTemplate && viewerTemplate.parent;
+
+        if (viewerElement) {
+            if (this._vrToggled) {
+                viewerElement.classList.add("in-vr");
+            } else {
+                viewerElement.classList.remove("in-vr");
+            }
+        }
     }
 
     /**
@@ -261,15 +349,22 @@ export class DefaultViewer extends AbstractViewer {
     public toggleFullscreen = () => {
         let viewerTemplate = this.templateManager.getTemplate('viewer');
         let viewerElement = viewerTemplate && viewerTemplate.parent;
+        let fullscreenElement = this.fullscreenElement || viewerElement;
 
-        if (viewerElement) {
-            let fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || (<any>document).mozFullScreenElement || (<any>document).msFullscreenElement;
-            if (!fullscreenElement) {
-                let requestFullScreen = viewerElement.requestFullscreen || viewerElement.webkitRequestFullscreen || (<any>viewerElement).msRequestFullscreen || (<any>viewerElement).mozRequestFullScreen;
-                requestFullScreen.call(viewerElement);
+        if (fullscreenElement) {
+            let currentElement = document.fullscreenElement || document.webkitFullscreenElement || (<any>document).mozFullScreenElement || (<any>document).msFullscreenElement;
+            if (!currentElement) {
+                let requestFullScreen = fullscreenElement.requestFullscreen || fullscreenElement.webkitRequestFullscreen || (<any>fullscreenElement).msRequestFullscreen || (<any>fullscreenElement).mozRequestFullScreen;
+                requestFullScreen.call(fullscreenElement);
+                if (viewerElement) {
+                    viewerElement.classList.add("in-fullscreen");
+                }
             } else {
                 let exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen || (<any>document).msExitFullscreen || (<any>document).mozCancelFullScreen
                 exitFullscreen.call(document);
+                if (viewerElement) {
+                    viewerElement.classList.remove("in-fullscreen");
+                }
             }
         }
     }
@@ -288,32 +383,39 @@ export class DefaultViewer extends AbstractViewer {
      * It is mainly responsible to changing the title and subtitle etc'.
      * @param model the model to be used to configure the templates by
      */
-    protected _configureTemplate(model: ViewerModel) {
+    protected _configureTemplate(model?: ViewerModel) {
         let navbar = this.templateManager.getTemplate('navBar');
         if (!navbar) return;
 
-        let newParams: any = {};
+        let newParams: any = navbar.configuration.params || {};
 
-        let animationNames = model.getAnimationNames();
-        if (animationNames.length >= 1) {
-            this._isAnimationPaused = (model.configuration.animation && !model.configuration.animation.autoStart) || !model.configuration.animation;
-            this._animationList = animationNames;
-            newParams.animations = this._animationList;
-            newParams.paused = this._isAnimationPaused;
-            let animationIndex = 0;
-            if (model.configuration.animation && typeof model.configuration.animation.autoStart === 'string') {
-                animationIndex = animationNames.indexOf(model.configuration.animation.autoStart);
-                if (animationIndex === -1) {
-                    animationIndex = 0;
+        if (!model) {
+            newParams.animations = null;
+        } else {
+
+            let animationNames = model.getAnimationNames();
+            newParams.animations = animationNames.map(a => { return { label: a, value: a } });
+            if (animationNames.length) {
+                this._isAnimationPaused = (model.configuration.animation && !model.configuration.animation.autoStart) || !model.configuration.animation;
+                this._animationList = animationNames;
+                newParams.paused = this._isAnimationPaused;
+                let animationIndex = 0;
+                if (model.configuration.animation && typeof model.configuration.animation.autoStart === 'string') {
+                    animationIndex = animationNames.indexOf(model.configuration.animation.autoStart);
+                    if (animationIndex === -1) {
+                        animationIndex = 0;
+                    }
                 }
+                this._updateAnimationType(newParams.animations[animationIndex], newParams);
+            } else {
+                newParams.animations = null;
             }
-            this._updateAnimationType(animationNames[animationIndex], newParams);
-        }
 
-        if (model.configuration.thumbnail) {
-            newParams.logoImage = model.configuration.thumbnail
+            if (model.configuration.thumbnail) {
+                newParams.logoImage = model.configuration.thumbnail
+            }
         }
-        navbar.updateParams(newParams);
+        navbar.updateParams(newParams, false);
     }
 
     /**
@@ -339,8 +441,8 @@ export class DefaultViewer extends AbstractViewer {
         this._configureTemplate(model);
         // with a short timeout, making sure everything is there already.
         let hideLoadingDelay = 20;
-        if (this._configuration.lab && this._configuration.lab.hideLoadingDelay !== undefined) {
-            hideLoadingDelay = this._configuration.lab.hideLoadingDelay;
+        if (this.configuration.lab && this.configuration.lab.hideLoadingDelay !== undefined) {
+            hideLoadingDelay = this.configuration.lab.hideLoadingDelay;
         }
         setTimeout(() => {
             this.sceneManager.scene.executeWhenReady(() => {
@@ -476,40 +578,62 @@ export class DefaultViewer extends AbstractViewer {
         }));
     }
 
+    public dispose() {
+        this.templateManager.dispose();
+        super.dispose();
+    }
+
+    protected _onConfigurationLoaded(configuration: ViewerConfiguration) {
+
+        super._onConfigurationLoaded(configuration);
+
+        // initialize the templates
+        let templateConfiguration = this.configuration.templates || {};
+
+        this.templateManager.initTemplate(templateConfiguration);
+        // when done, execute onTemplatesLoaded()
+        this.templateManager.onAllLoaded.add(() => {
+            let canvas = this.templateManager.getCanvas();
+            if (canvas) {
+                this._canvas = canvas;
+            }
+            this._onTemplateLoaded();
+        });
+    }
+
     /**
      * An extension of the light configuration of the abstract viewer.
      * @param lightsConfiguration the light configuration to use
      * @param model the model that will be used to configure the lights (if the lights are model-dependant)
      */
-    private _configureLights(lightsConfiguration: { [name: string]: ILightConfiguration | boolean | number } = {}, model?: ViewerModel) {
+    private _configureLights() {
         // labs feature - flashlight
-        if (this._configuration.lab && this._configuration.lab.flashlight) {
-            let pointerPosition = Vector3.Zero();
+        if (this.configuration.lab && this.configuration.lab.flashlight) {
             let lightTarget;
             let angle = 0.5;
             let exponent = Math.PI / 2;
-            if (typeof this._configuration.lab.flashlight === "object") {
-                exponent = this._configuration.lab.flashlight.exponent || exponent;
-                angle = this._configuration.lab.flashlight.angle || angle;
+            if (typeof this.configuration.lab.flashlight === "object") {
+                exponent = this.configuration.lab.flashlight.exponent || exponent;
+                angle = this.configuration.lab.flashlight.angle || angle;
             }
             var flashlight = new SpotLight("flashlight", Vector3.Zero(),
                 Vector3.Zero(), exponent, angle, this.sceneManager.scene);
-            if (typeof this._configuration.lab.flashlight === "object") {
-                flashlight.intensity = this._configuration.lab.flashlight.intensity || flashlight.intensity;
-                if (this._configuration.lab.flashlight.diffuse) {
-                    flashlight.diffuse.r = this._configuration.lab.flashlight.diffuse.r;
-                    flashlight.diffuse.g = this._configuration.lab.flashlight.diffuse.g;
-                    flashlight.diffuse.b = this._configuration.lab.flashlight.diffuse.b;
+            if (typeof this.configuration.lab.flashlight === "object") {
+                flashlight.intensity = this.configuration.lab.flashlight.intensity || flashlight.intensity;
+                if (this.configuration.lab.flashlight.diffuse) {
+                    flashlight.diffuse.r = this.configuration.lab.flashlight.diffuse.r;
+                    flashlight.diffuse.g = this.configuration.lab.flashlight.diffuse.g;
+                    flashlight.diffuse.b = this.configuration.lab.flashlight.diffuse.b;
                 }
-                if (this._configuration.lab.flashlight.specular) {
-                    flashlight.specular.r = this._configuration.lab.flashlight.specular.r;
-                    flashlight.specular.g = this._configuration.lab.flashlight.specular.g;
-                    flashlight.specular.b = this._configuration.lab.flashlight.specular.b;
+                if (this.configuration.lab.flashlight.specular) {
+                    flashlight.specular.r = this.configuration.lab.flashlight.specular.r;
+                    flashlight.specular.g = this.configuration.lab.flashlight.specular.g;
+                    flashlight.specular.b = this.configuration.lab.flashlight.specular.b;
                 }
 
             }
             this.sceneManager.scene.constantlyUpdateMeshUnderPointer = true;
-            this.sceneManager.scene.onPointerObservable.add((eventData, eventState) => {
+            this.sceneManager.scene.onPointerObservable.add((eventData) => {
                 if (eventData.type === 4 && eventData.pickInfo) {
                     lightTarget = (eventData.pickInfo.pickedPoint);
                 } else {

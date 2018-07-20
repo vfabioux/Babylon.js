@@ -86,6 +86,7 @@
         public REFLECTIONMAP_OPPOSITEZ = false;
         public LODINREFLECTIONALPHA = false;
         public GAMMAREFLECTION = false;
+        public RGBDREFLECTION = false;
         public RADIANCEOCCLUSION = false;
         public HORIZONOCCLUSION = false;
 
@@ -94,6 +95,7 @@
         public REFRACTIONMAP_OPPOSITEZ = false;
         public LODINREFRACTIONALPHA = false;
         public GAMMAREFRACTION = false;
+        public RGBDREFRACTION = false;
         public LINKREFRACTIONTOTRANSPARENCY = false;
 
         public INSTANCES = false;
@@ -523,9 +525,11 @@
             }
 
             // Attaches observer.
-            this._imageProcessingObserver = this._imageProcessingConfiguration.onUpdateParameters.add(conf => {
-                this._markAllSubMeshesAsImageProcessingDirty();
-            });
+            if (this._imageProcessingConfiguration) {
+                this._imageProcessingObserver = this._imageProcessingConfiguration.onUpdateParameters.add(conf => {
+                    this._markAllSubMeshesAsImageProcessingDirty();
+                });
+            }
         }
 
         /**
@@ -609,6 +613,14 @@
 
         /**
          * Sets the transparency mode of the material.
+         *
+         * | Value | Type                                | Description |
+         * | ----- | ----------------------------------- | ----------- |
+         * | 0     | OPAQUE                              |             |
+         * | 1     | ALPHATEST                           |             |
+         * | 2     | ALPHABLEND                          |             |
+         * | 3     | ALPHATESTANDBLEND                   |             |
+         *
          */
         public set transparencyMode(value: Nullable<number>) {
             if (this._transparencyMode === value) {
@@ -797,7 +809,7 @@
                 }
             }
 
-            if (defines._areImageProcessingDirty) {
+            if (defines._areImageProcessingDirty && this._imageProcessingConfiguration) {
                 if (!this._imageProcessingConfiguration.isReady()) {
                     return false;
                 }
@@ -973,8 +985,10 @@
                 "microSurfaceSampler", "environmentBrdfSampler"];
             var uniformBuffers = ["Material", "Scene"];
 
-            ImageProcessingConfiguration.PrepareUniforms(uniforms, defines);
-            ImageProcessingConfiguration.PrepareSamplers(samplers, defines);
+            if (ImageProcessingConfiguration) {
+                ImageProcessingConfiguration.PrepareUniforms(uniforms, defines);
+                ImageProcessingConfiguration.PrepareSamplers(samplers, defines);
+            }
 
             MaterialHelper.PrepareUniformsAndSamplersList(<EffectCreationOptions>{
                 uniformsNames: uniforms,
@@ -1039,6 +1053,7 @@
                     if (reflectionTexture && StandardMaterial.ReflectionTextureEnabled) {
                         defines.REFLECTION = true;
                         defines.GAMMAREFLECTION = reflectionTexture.gammaSpace;
+                        defines.RGBDREFLECTION = reflectionTexture.isRGBD;
                         defines.REFLECTIONMAP_OPPOSITEZ = this.getScene().useRightHandedSystem ? !reflectionTexture.invertZ : reflectionTexture.invertZ;
                         defines.LODINREFLECTIONALPHA = reflectionTexture.lodLevelInAlpha;
 
@@ -1111,6 +1126,7 @@
                         defines.REFLECTIONMAP_OPPOSITEZ = false;
                         defines.LODINREFLECTIONALPHA = false;
                         defines.GAMMAREFLECTION = false;
+                        defines.RGBDREFLECTION = false;
                     }
 
                     if (this._lightmapTexture && StandardMaterial.LightmapTextureEnabled) {
@@ -1174,6 +1190,7 @@
                         defines.REFRACTION = true;
                         defines.REFRACTIONMAP_3D = refractionTexture.isCube;
                         defines.GAMMAREFRACTION = refractionTexture.gammaSpace;
+                        defines.RGBDREFRACTION = refractionTexture.isRGBD;
                         defines.REFRACTIONMAP_OPPOSITEZ = refractionTexture.invertZ;
                         defines.LODINREFRACTIONALPHA = refractionTexture.lodLevelInAlpha;
 
@@ -1218,7 +1235,7 @@
                 defines.SPECULARAA = scene.getEngine().getCaps().standardDerivatives && this._enableSpecularAntiAliasing;
             }
 
-            if (defines._areImageProcessingDirty) {
+            if (defines._areImageProcessingDirty && this._imageProcessingConfiguration) {
                 this._imageProcessingConfiguration.prepareDefines(defines);
             }
 

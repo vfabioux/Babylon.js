@@ -98,7 +98,7 @@
         public delayLoadingFile: string;
         public _binaryInfo: any;
         private _LODLevels = new Array<MeshLODLevel>();
-        public onLODLevelSelection: (distance: number, mesh: Mesh, selectedLevel: Mesh) => void;
+        public onLODLevelSelection: (distance: number, mesh: Mesh, selectedLevel: Nullable<Mesh>) => void;
 
         // Morph
         private _morphTargetManager: Nullable<MorphTargetManager>;
@@ -242,6 +242,7 @@
                         system.clone(system.name, this);
                     }
                 }
+                this.refreshBoundingInfo();
                 this.computeWorldMatrix(true);
             }
 
@@ -331,11 +332,11 @@
         /**
          * Add a mesh as LOD level triggered at the given distance.
          * tuto : http://doc.babylonjs.com/tutorials/How_to_use_LOD
-         * @param {number} distance The distance from the center of the object to show this level
-         * @param {Mesh} mesh The mesh to be added as LOD level
-         * @return {Mesh} This mesh (for chaining)
+         * @param distance The distance from the center of the object to show this level
+         * @param mesh The mesh to be added as LOD level (can be null)
+         * @return This mesh (for chaining)
          */
-        public addLODLevel(distance: number, mesh: Mesh): Mesh {
+        public addLODLevel(distance: number, mesh: Nullable<Mesh>): Mesh {
             if (mesh && mesh._masterMesh) {
                 Tools.Warn("You cannot use a mesh as LOD level twice");
                 return this;
@@ -392,9 +393,9 @@
 
         /**
          * Returns the registered LOD mesh distant from the parameter `camera` position if any, else returns the current mesh.
-         * tuto : http://doc.babylonjs.com/tutorials/How_to_use_LOD
+         * tuto : http://doc.babylonjs.com/how_to/how_to_use_lod
          */
-        public getLOD(camera: Camera, boundingSphere?: BoundingSphere): AbstractMesh {
+        public getLOD(camera: Camera, boundingSphere?: BoundingSphere): Nullable<AbstractMesh> {
             if (!this._LODLevels || this._LODLevels.length === 0) {
                 return this;
             }
@@ -430,7 +431,8 @@
                     if (this.onLODLevelSelection) {
                         this.onLODLevelSelection(distanceToCamera, this, level.mesh);
                     }
-                    return level.mesh;
+
+                    return level.mesh;                   
                 }
             }
 
@@ -804,16 +806,18 @@
                         var weight: number;
                         for (inf = 0; inf < 4; inf++) {
                             weight = matricesWeightsData[matWeightIdx + inf];
-                            if (weight <= 0) break;
-                            Matrix.FromFloat32ArrayToRefScaled(skeletonMatrices, Math.floor(matricesIndicesData[matWeightIdx + inf] * 16), weight, tempMatrix);
-                            finalMatrix.addToSelf(tempMatrix);
+                            if (weight > 0) {
+                                Matrix.FromFloat32ArrayToRefScaled(skeletonMatrices, Math.floor(matricesIndicesData[matWeightIdx + inf] * 16), weight, tempMatrix);
+                                finalMatrix.addToSelf(tempMatrix);
+                            }
                         }
                         if (needExtras) {
                             for (inf = 0; inf < 4; inf++) {
                                 weight = matricesWeightsExtraData![matWeightIdx + inf];
-                                if (weight <= 0) break;
-                                Matrix.FromFloat32ArrayToRefScaled(skeletonMatrices, Math.floor(matricesIndicesExtraData![matWeightIdx + inf] * 16), weight, tempMatrix);
-                                finalMatrix.addToSelf(tempMatrix);
+                                if (weight > 0) {
+                                    Matrix.FromFloat32ArrayToRefScaled(skeletonMatrices, Math.floor(matricesIndicesExtraData![matWeightIdx + inf] * 16), weight, tempMatrix);
+                                    finalMatrix.addToSelf(tempMatrix);
+                                }
                             }
                         }
 
@@ -1283,9 +1287,10 @@
         }
 
         /**
-         * Triggers the draw call for the mesh.
-         * Usually, you don't need to call this method by your own because the mesh rendering is handled by the scene rendering manager.   
-         * Returns the Mesh.   
+         * Triggers the draw call for the mesh. Usually, you don't need to call this method by your own because the mesh rendering is handled by the scene rendering manager
+         * @param subMesh defines the subMesh to render
+         * @param enableAlphaMode defines if alpha mode can be changed
+         * @returns the current mesh
          */
         public render(subMesh: SubMesh, enableAlphaMode: boolean): Mesh {
 
@@ -1295,7 +1300,6 @@
             }
 
             var scene = this.getScene();
-
             // Managing instances
             var batch = this._getInstancesRenderList(subMesh._id);
 
@@ -1422,7 +1426,7 @@
         }
 
         /**
-         * Returns an array populated with ParticleSystem objects whose the mesh is the emitter. 
+         * Returns an array populated with IParticleSystem objects whose the mesh is the emitter. 
          */
         public getEmittedParticleSystems(): IParticleSystem[] {
             var results = new Array<IParticleSystem>();
@@ -1436,7 +1440,7 @@
         }
 
         /**
-         * Returns an array populated with ParticleSystem objects whose the mesh or its children are the emitter.
+         * Returns an array populated with IParticleSystem objects whose the mesh or its children are the emitter.
          */
         public getHierarchyEmittedParticleSystems(): IParticleSystem[] {
             var results = new Array<IParticleSystem>();
@@ -1764,14 +1768,6 @@
                 this.instances[0].dispose();
             }
 
-            // Effect layers.
-            let effectLayers = this.getScene().effectLayers;
-            for (let i = 0; i < effectLayers.length; i++) {
-                let effectLayer = effectLayers[i];
-                if (effectLayer) {
-                    effectLayer._disposeMesh(this);
-                }
-            }
             super.dispose(doNotRecurse, disposeMaterialAndTextures);
         }
 
@@ -2620,7 +2616,11 @@
                             instance.animations.push(Animation.Parse(parsedAnimation));
                         }
                         Node.ParseAnimationRanges(instance, parsedMesh, scene);
-                    }
+
+                        if (parsedMesh.autoAnimate) {
+                            scene.beginAnimation(instance, parsedMesh.autoAnimateFrom, parsedMesh.autoAnimateTo, parsedMesh.autoAnimateLoop, parsedMesh.autoAnimateSpeed || 1.0);
+                        }                            
+                }
                 }
             }
 
@@ -3287,8 +3287,7 @@
                     if (weight > 0) {
                         Matrix.FromFloat32ArrayToRefScaled(skeletonMatrices, Math.floor(matricesIndicesData[matWeightIdx + inf] * 16), weight, tempMatrix);
                         finalMatrix.addToSelf(tempMatrix);
-
-                    } else break;
+                    }
                 }
                 if (needExtras) {
                     for (inf = 0; inf < 4; inf++) {
@@ -3296,8 +3295,7 @@
                         if (weight > 0) {
                             Matrix.FromFloat32ArrayToRefScaled(skeletonMatrices, Math.floor(matricesIndicesExtraData![matWeightIdx + inf] * 16), weight, tempMatrix);
                             finalMatrix.addToSelf(tempMatrix);
-
-                        } else break;
+                        }
                     }
                 }
 
@@ -3392,7 +3390,7 @@
             for (index = 0; index < meshes.length; index++) {
                 if (meshes[index]) {
                     meshes[index].computeWorldMatrix(true);
-                    otherVertexData = VertexData.ExtractFromMesh(meshes[index], true);
+                    otherVertexData = VertexData.ExtractFromMesh(meshes[index], true, true);
                     otherVertexData.transform(meshes[index].getWorldMatrix());
 
                     if (vertexData) {
@@ -3432,12 +3430,12 @@
             // Subdivide
             if (subdivideWithSubMeshes) {
 
-                //-- Suppresions du submesh global
+                //-- removal of global submesh
                 meshSubclass.releaseSubMeshes();
                 index = 0;
                 var offset = 0;
 
-                //-- aplique la subdivision en fonction du tableau d'indices
+                //-- apply subdivision according to index table
                 while (index < indiceArray.length) {
                     SubMesh.CreateFromIndices(0, offset, indiceArray[index], meshSubclass);
                     offset += indiceArray[index];

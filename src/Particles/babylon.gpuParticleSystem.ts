@@ -33,6 +33,7 @@
         private _capacity: number;
         private _activeCount: number;
         private _currentActiveCount: number;
+        private _accumulatedCount = 0;
         private _renderEffect: Effect;
         private _updateEffect: Effect;
 
@@ -56,12 +57,15 @@
         private _timeDelta = 0;
 
         private _randomTexture: RawTexture;
+        private _randomTexture2: RawTexture;
 
-        private readonly _attributesStrideSize = 16;
+        private _attributesStrideSize = 21;
         private _updateEffectOptions: EffectCreationOptions;
 
         private _randomTextureSize: number;
-        private _actualFrame = 0;        
+        private _actualFrame = 0;      
+        
+        private readonly _rawTextureWidth = 256;
 
         /**
          * List of animations used by the particle system.
@@ -119,7 +123,25 @@
         /**
          * Maximum Size of emitting particles.
          */
-        public maxSize = 1;        
+        public maxSize = 1;  
+        
+        /**
+         * Minimum scale of emitting particles on X axis.
+         */
+        public minScaleX = 1;
+        /**
+         * Maximum scale of emitting particles on X axis.
+         */
+        public maxScaleX = 1;        
+
+        /**
+         * Minimum scale of emitting particles on Y axis.
+         */
+        public minScaleY = 1;
+        /**
+         * Maximum scale of emitting particles on Y axis.
+         */
+        public maxScaleY = 1;           
         
         /**
          * Random color of each particle after it has been emitted, between color1 and color2 vectors.
@@ -266,6 +288,70 @@
             this._activeCount = Math.min(value, this._capacity);
         }
 
+        private _preWarmDone = false;
+
+        /** Gets or sets a value indicating how many cycles (or frames) must be executed before first rendering (this value has to be set before starting the system). Default is 0 */
+        public preWarmCycles = 0;
+
+        /** Gets or sets a value indicating the time step multiplier to use in pre-warm mode (default is 1) */
+        public preWarmStepOffset = 1;        
+
+        /**
+         * Gets or sets the minimal initial rotation in radians.         
+         */
+        public minInitialRotation = 0;
+        /**
+         * Gets or sets the maximal initial rotation in radians.         
+         */
+        public maxInitialRotation = 0;   
+        
+        /**
+         * If using a spritesheet (isAnimationSheetEnabled) defines the speed of the sprite loop (default is 1 meaning the animation will play once during the entire particle lifetime)
+         */
+        public spriteCellChangeSpeed = 1;
+        /**
+         * If using a spritesheet (isAnimationSheetEnabled) defines the first sprite cell to display
+         */
+        public startSpriteCellID = 0;
+        /**
+         * If using a spritesheet (isAnimationSheetEnabled) defines the last sprite cell to display
+         */
+        public endSpriteCellID = 0;
+        /**
+         * If using a spritesheet (isAnimationSheetEnabled), defines the sprite cell width to use
+         */
+        public spriteCellWidth = 0;
+        /**
+         * If using a spritesheet (isAnimationSheetEnabled), defines the sprite cell height to use
+         */
+        public spriteCellHeight = 0;
+
+        /** Gets or sets a Vector2 used to move the pivot (by default (0,0)) */
+        public translationPivot = new Vector2(0, 0);     
+
+        /**
+         * Gets or sets a texture used to add random noise to particle positions
+         */
+        public noiseTexture: Nullable<BaseTexture>;
+
+        /** Gets or sets the strength to apply to the noise value (default is (10, 10, 10)) */
+        public noiseStrength = new Vector3(10, 10, 10);        
+        
+        /**
+         * Gets or sets the billboard mode to use when isBillboardBased = true.
+         * Only BABYLON.AbstractMesh.BILLBOARDMODE_ALL and AbstractMesh.BILLBOARDMODE_Y are supported so far
+         */
+        public billboardMode = AbstractMesh.BILLBOARDMODE_ALL;        
+                
+        private _isAnimationSheetEnabled: boolean;
+
+        /**
+         * Gets whether an animation sprite sheet is enabled or not on the particle system
+         */
+        public get isAnimationSheetEnabled(): boolean {
+            return this._isAnimationSheetEnabled;
+        }        
+
         /**
          * Is this system ready to be used/rendered
          * @return true if the system is ready
@@ -294,11 +380,19 @@
         }
 
         /**
-         * Starts the particle system and begins to emit.
+         * Starts the particle system and begins to emit
+         * @param delay defines the delay in milliseconds before starting the system (0 by default)
          */
-        public start(): void {
+        public start(delay = 0): void {
+            if (delay) {
+                setTimeout(()=> {
+                    this.start(0);
+                }, delay);
+                return;
+            }
             this._started = true;
             this._stopped = false;
+            this._preWarmDone = false;
         }
 
         /**
@@ -325,22 +419,290 @@
         public getClassName(): string {
             return "GPUParticleSystem";
         }            
+        
+        private _isBillboardBased = true;
+
+        /**
+         * Gets or sets a boolean indicating if the particles must be rendered as billboard or aligned with the direction
+         */
+        public get isBillboardBased(): boolean {
+            return this._isBillboardBased;
+        }      
+        
+        public set isBillboardBased(value: boolean) {
+            if (this._isBillboardBased === value) {
+                return;
+            }
+
+            this._isBillboardBased = value;
+
+            this._releaseBuffers();
+        }        
+        
+        private _colorGradients: Nullable<Array<ColorGradient>> = null;
+        private _colorGradientsTexture: RawTexture;
+
+        /**
+         * Gets the current list of color gradients.
+         * You must use addColorGradient and removeColorGradient to udpate this list
+         * @returns the list of color gradients
+         */
+        public getColorGradients(): Nullable<Array<ColorGradient>> {
+            return this._colorGradients;
+        }
+
+        /**
+         * Gets the current list of size gradients.
+         * You must use addSizeGradient and removeSizeGradient to udpate this list
+         * @returns the list of size gradients
+         */
+        public getSizeGradients(): Nullable<Array<FactorGradient>> {
+            return this._sizeGradients;
+        }      
+        
+        /**
+         * Gets the current list of angular speed gradients.
+         * You must use addAngularSpeedGradient and removeAngularSpeedGradient to udpate this list
+         * @returns the list of angular speed gradients
+         */
+        public getAngularSpeedGradients(): Nullable<Array<FactorGradient>> {
+            return this._angularSpeedGradients;
+        } 
+
+        /**
+         * Gets the current list of velocity gradients.
+         * You must use addVelocityGradient and removeVelocityGradient to udpate this list
+         * @returns the list of angular speed gradients
+         */
+        public getVelocityGradients(): Nullable<Array<FactorGradient>> {
+            return this._velocityGradients;
+        }         
+
+        private _removeGradient(gradient: number, gradients: Nullable<IValueGradient[]>, texture: RawTexture): GPUParticleSystem {
+            if (!gradients) {
+                return this;
+            }
+
+            let index = 0;
+            for (var valueGradient of gradients) {
+                if (valueGradient.gradient === gradient) {
+                    gradients.splice(index, 1);
+                    break;
+                }
+                index++;
+            }
+
+            if (texture) {
+                texture.dispose();
+            }            
+
+            this._releaseBuffers();
+
+            return this;
+        }    
+        
+        /**
+         * Adds a new color gradient
+         * @param gradient defines the gradient to use (between 0 and 1)
+         * @param color defines the color to affect to the specified gradient
+         * @param color2 defines an additional color used to define a range ([color, color2]) with main color to pick the final color from
+         * @returns the current particle system
+         */
+        public addColorGradient(gradient: number, color1: Color4, color2?: Color4): GPUParticleSystem {
+            if (!this._colorGradients) {
+                this._colorGradients = [];
+            }
+
+            let colorGradient = new ColorGradient();
+            colorGradient.gradient = gradient;
+            colorGradient.color1 = color1;
+            this._colorGradients.push(colorGradient);
+
+            this._colorGradients.sort((a, b) => {
+                if (a.gradient < b.gradient) {
+                    return -1;
+                } else if (a.gradient > b.gradient) {
+                    return 1;
+                }
+
+                return 0;
+            });
+
+            if (this._colorGradientsTexture) {
+                this._colorGradientsTexture.dispose();
+                (<any>this._colorGradientsTexture) = null;
+            }
+
+            this._releaseBuffers();            
+
+            return this;
+        }
+
+        /**
+         * Remove a specific color gradient
+         * @param gradient defines the gradient to remove
+         * @returns the current particle system
+         */
+        public removeColorGradient(gradient: number): GPUParticleSystem {
+            this._removeGradient(gradient, this._colorGradients, this._colorGradientsTexture);
+            (<any>this._colorGradientsTexture) = null;
+
+            return this;
+        }    
+
+        private _angularSpeedGradients: Nullable<Array<FactorGradient>> = null;
+        private _angularSpeedGradientsTexture: RawTexture;    
+        
+        private _sizeGradients: Nullable<Array<FactorGradient>> = null;
+        private _sizeGradientsTexture: RawTexture;     
+        
+        private _velocityGradients: Nullable<Array<FactorGradient>> = null;
+        private _velocityGradientsTexture: RawTexture;    
+
+        private _addFactorGradient(factorGradients: FactorGradient[], gradient: number, factor: number) {
+            let valueGradient = new FactorGradient();
+            valueGradient.gradient = gradient;
+            valueGradient.factor1 = factor;
+            factorGradients.push(valueGradient);
+
+            factorGradients.sort((a, b) => {
+                if (a.gradient < b.gradient) {
+                    return -1;
+                } else if (a.gradient > b.gradient) {
+                    return 1;
+                }
+
+                return 0;
+            });
+
+            this._releaseBuffers();               
+        }
+        
+        /**
+         * Adds a new size gradient
+         * @param gradient defines the gradient to use (between 0 and 1)
+         * @param factor defines the size factor to affect to the specified gradient
+         * @returns the current particle system
+         */
+        public addSizeGradient(gradient: number, factor: number): GPUParticleSystem {
+            if (!this._sizeGradients) {
+                this._sizeGradients = [];
+            }
+
+            this._addFactorGradient(this._sizeGradients, gradient, factor);
+
+            if (this._sizeGradientsTexture) {
+                this._sizeGradientsTexture.dispose();
+                (<any>this._sizeGradientsTexture) = null;
+            }
+
+            this._releaseBuffers();                 
+
+            return this;
+        }
+
+        /**
+         * Remove a specific size gradient
+         * @param gradient defines the gradient to remove
+         * @returns the current particle system
+         */
+        public removeSizeGradient(gradient: number): GPUParticleSystem {
+            this._removeGradient(gradient, this._sizeGradients, this._sizeGradientsTexture);
+            (<any>this._sizeGradientsTexture) = null;
+
+            return this;            
+        }   
+        
+        /**
+         * Adds a new angular speed gradient
+         * @param gradient defines the gradient to use (between 0 and 1)
+         * @param factor defines the size factor to affect to the specified gradient    
+         * @returns the current particle system     
+         */
+        public addAngularSpeedGradient(gradient: number, factor: number): GPUParticleSystem {
+            if (!this._angularSpeedGradients) {
+                this._angularSpeedGradients = [];
+            }
+
+            this._addFactorGradient(this._angularSpeedGradients, gradient, factor);
+
+            if (this._angularSpeedGradientsTexture) {
+                this._angularSpeedGradientsTexture.dispose();
+                (<any>this._angularSpeedGradientsTexture) = null;
+            }
+
+            this._releaseBuffers();   
+
+            return this;
+        }
+
+        /**
+         * Remove a specific angular speed gradient
+         * @param gradient defines the gradient to remove
+         * @returns the current particle system
+         */
+        public removeAngularSpeedGradient(gradient: number): GPUParticleSystem {
+            this._removeGradient(gradient, this._angularSpeedGradients, this._angularSpeedGradientsTexture);
+            (<any>this._angularSpeedGradientsTexture) = null;
+
+            return this;           
+        }           
+        
+        /**
+         * Adds a new velocity gradient
+         * @param gradient defines the gradient to use (between 0 and 1)
+         * @param factor defines the size factor to affect to the specified gradient    
+         * @returns the current particle system     
+         */
+        public addVelocityGradient(gradient: number, factor: number): GPUParticleSystem {
+            if (!this._velocityGradients) {
+                this._velocityGradients = [];
+            }
+
+            this._addFactorGradient(this._velocityGradients, gradient, factor);
+
+            if (this._velocityGradientsTexture) {
+                this._velocityGradientsTexture.dispose();
+                (<any>this._velocityGradientsTexture) = null;
+            }
+
+            this._releaseBuffers();   
+
+            return this;
+        }
+
+        /**
+         * Remove a specific velocity gradient
+         * @param gradient defines the gradient to remove
+         * @returns the current particle system
+         */
+        public removeVelocityGradient(gradient: number): GPUParticleSystem {
+            this._removeGradient(gradient, this._velocityGradients, this._velocityGradientsTexture);
+            (<any>this._velocityGradientsTexture) = null;
+
+            return this;           
+        }          
 
         /**
          * Instantiates a GPU particle system.
          * Particles are often small sprites used to simulate hard-to-reproduce phenomena like fire, smoke, water, or abstract visual effects like magic glitter and faery dust.
          * @param name The name of the particle system
-         * @param capacity The max number of particles alive at the same time
+         * @param options The options used to create the system
          * @param scene The scene the particle system belongs to
+         * @param isAnimationSheetEnabled Must be true if using a spritesheet to animate the particles texture
          */
         constructor(name: string, options: Partial<{
                         capacity: number,
                         randomTextureSize: number
-                    }>, scene: Scene) {
+                    }>, scene: Scene, isAnimationSheetEnabled: boolean = false) {
             this.id = name;
             this.name = name;
             this._scene = scene || Engine.LastCreatedScene;
             this._engine = this._scene.getEngine();
+
+            if (!options.randomTextureSize) {
+                delete options.randomTextureSize;
+            }
 
             let fullOptions = {
                 capacity: 50000,
@@ -348,27 +710,35 @@
                 ...options
             };
 
+            var optionsAsNumber = <number>options;
+            if (isFinite(optionsAsNumber)) {
+                fullOptions.capacity = optionsAsNumber;
+            }
+
             this._capacity = fullOptions.capacity;
             this._activeCount = fullOptions.capacity;
             this._currentActiveCount = 0;
+            this._isAnimationSheetEnabled = isAnimationSheetEnabled;
 
             this._scene.particleSystems.push(this);
 
             this._updateEffectOptions = {
-                attributes: ["position", "age", "life", "seed", "size", "color", "direction", "angle"],
-                uniformsNames: ["currentCount", "timeDelta", "generalRandoms", "emitterWM", "lifeTime", "color1", "color2", "sizeRange", "gravity", "emitPower",
+                attributes: ["position", "age", "life", "seed", "size", "color", "direction", "initialDirection", "angle", "cellIndex"],
+                uniformsNames: ["currentCount", "timeDelta", "emitterWM", "lifeTime", "color1", "color2", "sizeRange", "scaleRange","gravity", "emitPower",
                                 "direction1", "direction2", "minEmitBox", "maxEmitBox", "radius", "directionRandomizer", "height", "coneAngle", "stopFactor", 
-                                "angleRange"],
+                                "angleRange", "radiusRange", "cellInfos", "noiseStrength"],
                 uniformBuffersNames: [],
-                samplers:["randomSampler"],
+                samplers:["randomSampler", "randomSampler2", "sizeGradientSampler", "angularSpeedGradientSampler", "velocityGradientSampler", "noiseSampler"],
                 defines: "",
                 fallbacks: null,  
                 onCompiled: null,
                 onError: null,
                 indexParameters: null,
                 maxSimultaneousLights: 0,                                                      
-                transformFeedbackVaryings: ["outPosition", "outAge", "outLife", "outSeed", "outSize", "outColor", "outDirection", "outAngle"]
+                transformFeedbackVaryings: []
             };
+
+            this.particleEmitterType = new BoxParticleEmitter();
 
             // Random data
             var maxTextureSize = Math.min(this._engine.getCaps().maxTextureSize, fullOptions.randomTextureSize);
@@ -379,12 +749,22 @@
                 d.push(Math.random());
                 d.push(Math.random());
             }
-            this._randomTexture = new RawTexture(new Float32Array(d), maxTextureSize, 1, Engine.TEXTUREFORMAT_RGBA32F, this._scene, false, false, Texture.NEAREST_SAMPLINGMODE, Engine.TEXTURETYPE_FLOAT)
+            this._randomTexture = new RawTexture(new Float32Array(d), maxTextureSize, 1, Engine.TEXTUREFORMAT_RGBA, this._scene, false, false, Texture.NEAREST_SAMPLINGMODE, Engine.TEXTURETYPE_FLOAT);
             this._randomTexture.wrapU = Texture.WRAP_ADDRESSMODE;
             this._randomTexture.wrapV = Texture.WRAP_ADDRESSMODE;
 
+            d = [];
+            for (var i = 0; i < maxTextureSize; ++i) {
+                d.push(Math.random());
+                d.push(Math.random());
+                d.push(Math.random());
+                d.push(Math.random());
+            }
+            this._randomTexture2 = new RawTexture(new Float32Array(d), maxTextureSize, 1, Engine.TEXTUREFORMAT_RGBA, this._scene, false, false, Texture.NEAREST_SAMPLINGMODE, Engine.TEXTURETYPE_FLOAT);
+            this._randomTexture2.wrapU = Texture.WRAP_ADDRESSMODE;
+            this._randomTexture2.wrapV = Texture.WRAP_ADDRESSMODE;
+
             this._randomTextureSize = maxTextureSize;
-            this.particleEmitterType = new BoxParticleEmitter();
         }
 
         private _createUpdateVAO(source: Buffer): WebGLVertexArrayObject {            
@@ -392,11 +772,35 @@
             updateVertexBuffers["position"] = source.createVertexBuffer("position", 0, 3);
             updateVertexBuffers["age"] = source.createVertexBuffer("age", 3, 1);
             updateVertexBuffers["life"] = source.createVertexBuffer("life", 4, 1);
-            updateVertexBuffers["seed"] = source.createVertexBuffer("seed", 5, 1);
-            updateVertexBuffers["size"] = source.createVertexBuffer("size", 6, 1);
-            updateVertexBuffers["color"] = source.createVertexBuffer("color", 7, 4);
-            updateVertexBuffers["direction"] = source.createVertexBuffer("direction", 11, 3);
-            updateVertexBuffers["angle"] = source.createVertexBuffer("angle", 14, 2);
+            updateVertexBuffers["seed"] = source.createVertexBuffer("seed", 5, 4);
+            updateVertexBuffers["size"] = source.createVertexBuffer("size", 9, 3);
+            let offset = 12;
+
+            if (!this._colorGradientsTexture) {
+                updateVertexBuffers["color"] = source.createVertexBuffer("color", offset, 4);
+                offset += 4;
+            }
+
+            updateVertexBuffers["direction"] = source.createVertexBuffer("direction", offset, 3);
+            offset += 3
+
+            if (!this._isBillboardBased) {
+                updateVertexBuffers["initialDirection"] = source.createVertexBuffer("initialDirection", offset, 3);
+                offset += 3;
+            }
+
+            if (this._angularSpeedGradientsTexture) {
+                updateVertexBuffers["angle"] = source.createVertexBuffer("angle", offset, 1);
+                offset += 1;
+            } else {
+                updateVertexBuffers["angle"] = source.createVertexBuffer("angle", offset, 2);
+                offset += 2;
+            }
+
+            if (this._isAnimationSheetEnabled) {
+                updateVertexBuffers["cellIndex"] = source.createVertexBuffer("cellIndex", offset, 1);
+                offset += 1;
+            }            
            
             let vao = this._engine.recordVertexArrayObject(updateVertexBuffers, null, this._updateEffect);
             this._engine.bindArrayBuffer(null);
@@ -409,9 +813,33 @@
             renderVertexBuffers["position"] = source.createVertexBuffer("position", 0, 3, this._attributesStrideSize, true);
             renderVertexBuffers["age"] = source.createVertexBuffer("age", 3, 1, this._attributesStrideSize, true);
             renderVertexBuffers["life"] = source.createVertexBuffer("life", 4, 1, this._attributesStrideSize, true);
-            renderVertexBuffers["size"] = source.createVertexBuffer("size", 6, 1, this._attributesStrideSize, true);           
-            renderVertexBuffers["color"] = source.createVertexBuffer("color", 7, 4, this._attributesStrideSize, true);
-            renderVertexBuffers["angle"] = source.createVertexBuffer("angle", 14, 2, this._attributesStrideSize, true);
+            renderVertexBuffers["size"] = source.createVertexBuffer("size", 9, 3, this._attributesStrideSize, true);      
+            
+            let offset = 12;
+
+            if (!this._colorGradientsTexture) {
+                renderVertexBuffers["color"] = source.createVertexBuffer("color", offset, 4, this._attributesStrideSize, true);
+                offset += 4;
+            }
+            
+            offset += 3; // Direction
+
+            if (!this._isBillboardBased) {
+                renderVertexBuffers["initialDirection"] = source.createVertexBuffer("initialDirection", offset, 3, this._attributesStrideSize, true);
+                offset += 3;
+            }
+
+            renderVertexBuffers["angle"] = source.createVertexBuffer("angle", offset, 1, this._attributesStrideSize, true);
+            if (this._angularSpeedGradientsTexture) {
+                offset++;
+            } else {
+                offset += 2;
+            }
+
+            if (this._isAnimationSheetEnabled) {
+                renderVertexBuffers["cellIndex"] = source.createVertexBuffer("cellIndex", offset, 1, this._attributesStrideSize, true);
+                offset += 1;
+            }               
 
             renderVertexBuffers["offset"] = spriteSource.createVertexBuffer("offset", 0, 2);
             renderVertexBuffers["uv"] = spriteSource.createVertexBuffer("uv", 2, 2);
@@ -429,36 +857,74 @@
 
             let engine = this._scene.getEngine();
             var data = new Array<float>();
+
+            if (!this.isBillboardBased) {
+                this._attributesStrideSize += 3;
+            }
+
+            if (this._colorGradientsTexture) {
+                this._attributesStrideSize -= 4;
+            }
+
+            if (this._angularSpeedGradientsTexture) {
+                this._attributesStrideSize -= 1;
+            }            
+
+            if (this._isAnimationSheetEnabled) {
+                this._attributesStrideSize += 1;
+            }            
+
             for (var particleIndex = 0; particleIndex < this._capacity; particleIndex++) {
-              // position
-              data.push(0.0);
-              data.push(0.0);
-              data.push(0.0);
+                // position
+                data.push(0.0);
+                data.push(0.0);
+                data.push(0.0);
 
-              // Age and life
-              data.push(0.0); // create the particle as a dead one to create a new one at start
-              data.push(0.0);
+                // Age and life
+                data.push(0.0); // create the particle as a dead one to create a new one at start
+                data.push(0.0);
 
-              // Seed
-              data.push(Math.random());
+                // Seed
+                data.push(Math.random());
+                data.push(Math.random());
+                data.push(Math.random());
+                data.push(Math.random());
 
-              // Size
-              data.push(0.0);
+                // Size
+                data.push(0.0);
+                data.push(0.0);
+                data.push(0.0);
 
-              // color
-              data.push(0.0);
-              data.push(0.0);
-              data.push(0.0);                     
-              data.push(0.0); 
+                if (!this._colorGradientsTexture) {
+                    // color
+                    data.push(0.0);
+                    data.push(0.0);
+                    data.push(0.0);                     
+                    data.push(0.0); 
+                }
 
-              // direction
-              data.push(0.0);
-              data.push(0.0);
-              data.push(0.0);     
-              
-              // angle
-              data.push(0.0);  
-              data.push(0.0); 
+                // direction
+                data.push(0.0);
+                data.push(0.0);
+                data.push(0.0);  
+
+                if (!this.isBillboardBased) {
+                    // initialDirection
+                    data.push(0.0);
+                    data.push(0.0);
+                    data.push(0.0);  
+                }
+
+                // angle
+                data.push(0.0);  
+
+                if (!this._angularSpeedGradientsTexture) {
+                    data.push(0.0); 
+                }
+
+                if (this._isAnimationSheetEnabled) {
+                    data.push(0.0); 
+                }                
             }
 
             // Sprite data
@@ -491,9 +957,57 @@
         /** @hidden */
         public _recreateUpdateEffect() {
             let defines = this.particleEmitterType ? this.particleEmitterType.getEffectDefines() : "";
+
+            if (this._isBillboardBased) {
+                defines += "\n#define BILLBOARD";
+            }   
+
+            if (this._colorGradientsTexture) {
+                defines += "\n#define COLORGRADIENTS";
+            }        
+            
+            if (this._sizeGradientsTexture) {
+                defines += "\n#define SIZEGRADIENTS";
+            }     
+
+            if (this._angularSpeedGradientsTexture) {
+                defines += "\n#define ANGULARSPEEDGRADIENTS";
+            }               
+            
+            if (this._velocityGradientsTexture) {
+                defines += "\n#define VELOCITYGRADIENTS";
+            }                    
+            
+            if (this.isAnimationSheetEnabled) {
+                defines += "\n#define ANIMATESHEET";
+            }   
+            
+            if (this.noiseTexture) {
+                defines += "\n#define NOISE";
+            }
+
             if (this._updateEffect && this._updateEffectOptions.defines === defines) {
                 return;
             }
+
+            this._updateEffectOptions.transformFeedbackVaryings = ["outPosition", "outAge", "outLife", "outSeed", "outSize"];           
+
+            if (!this._colorGradientsTexture) {
+                this._updateEffectOptions.transformFeedbackVaryings.push("outColor");
+            }
+
+            this._updateEffectOptions.transformFeedbackVaryings.push("outDirection");
+
+            if (!this._isBillboardBased) {
+                this._updateEffectOptions.transformFeedbackVaryings.push("outInitialDirection");
+            }
+
+            this._updateEffectOptions.transformFeedbackVaryings.push("outAngle");
+
+            if (this.isAnimationSheetEnabled) {
+                this._updateEffectOptions.transformFeedbackVaryings.push("outCellIndex");
+            }               
+
             this._updateEffectOptions.defines = defines;
             this._updateEffect = new Effect("gpuUpdateParticles", this._updateEffectOptions, this._scene.getEngine());   
         }
@@ -505,21 +1019,43 @@
                 defines = "\n#define CLIPPLANE";
             }
 
+            if (this._isBillboardBased) {
+                defines += "\n#define BILLBOARD";
+
+                switch (this.billboardMode) {
+                    case AbstractMesh.BILLBOARDMODE_Y:
+                        defines += "\n#define BILLBOARDY";
+                        break;
+                    case AbstractMesh.BILLBOARDMODE_ALL:
+                    default:
+                        break;
+                }                
+            }         
+            
+            if (this._colorGradientsTexture) {
+                defines += "\n#define COLORGRADIENTS";
+            }   
+
+            if (this.isAnimationSheetEnabled) {
+                defines += "\n#define ANIMATESHEET";
+            }                 
+
             if (this._renderEffect && this._renderEffect.defines === defines) {
                 return;
             }
 
             this._renderEffect = new Effect("gpuRenderParticles", 
-                                            ["position", "age", "life", "size", "color", "offset", "uv", "angle"], 
-                                            ["view", "projection", "colorDead", "invView", "vClipPlane"], 
-                                            ["textureSampler"], this._scene.getEngine(), defines);
+                                            ["position", "age", "life", "size", "color", "offset", "uv", "initialDirection", "angle", "cellIndex"], 
+                                            ["view", "projection", "colorDead", "invView", "vClipPlane", "sheetInfos", "translationPivot", "eyePosition"], 
+                                            ["textureSampler", "colorGradientSampler"], this._scene.getEngine(), defines);
         }        
 
         /**
          * Animates the particle system for the current frame by emitting new particles and or animating the living ones.
+         * @param preWarm defines if we are in the pre-warmimg phase
          */
-        public animate(): void {           
-            this._timeDelta = this.updateSpeed * this._scene.getAnimationRatio();   
+        public animate(preWarm = false): void {           
+            this._timeDelta = this.updateSpeed * (preWarm ? this.preWarmStepOffset : this._scene.getAnimationRatio());
             this._actualFrame += this._timeDelta;
 
             if (!this._stopped) {
@@ -527,16 +1063,79 @@
                     this.stop();
                 }
             }             
-        }        
+        }    
+
+        private _createFactorGradientTexture(factorGradients: Nullable<IValueGradient[]>, textureName: string) {
+            let texture:RawTexture = (<any>this)[textureName];
+
+            if (!factorGradients || !factorGradients.length || texture) {
+                return;
+            }
+
+            let data = new Float32Array(this._rawTextureWidth);
+
+            for (var x = 0; x < this._rawTextureWidth; x++) {
+                var ratio = x / this._rawTextureWidth;
+
+                Tools.GetCurrentGradient(ratio, factorGradients, (currentGradient, nextGradient, scale) => {
+                    data[x] = Scalar.Lerp((<FactorGradient>currentGradient).factor1, (<FactorGradient>nextGradient).factor1, scale);
+                });
+            }
+
+            (<any>this)[textureName] = RawTexture.CreateRTexture(data, this._rawTextureWidth, 1, this._scene, false, false, Texture.NEAREST_SAMPLINGMODE);
+        }            
+
+        private _createSizeGradientTexture() {
+            this._createFactorGradientTexture(this._sizeGradients, "_sizeGradientsTexture");
+        }     
+        
+        private _createAngularSpeedGradientTexture() {
+            this._createFactorGradientTexture(this._angularSpeedGradients, "_angularSpeedGradientsTexture");
+        }     
+
+        private _createVelocityGradientTexture() {
+            this._createFactorGradientTexture(this._velocityGradients, "_velocityGradientsTexture");
+        }          
+            
+        private _createColorGradientTexture() {
+            if (!this._colorGradients || !this._colorGradients.length || this._colorGradientsTexture) {
+                return;
+            }
+
+            let data = new Uint8Array(this._rawTextureWidth * 4);
+            let tmpColor = Tmp.Color4[0];
+
+            for (var x = 0; x < this._rawTextureWidth; x++) {
+                var ratio = x / this._rawTextureWidth;
+
+                Tools.GetCurrentGradient(ratio, this._colorGradients, (currentGradient, nextGradient, scale) => {
+
+                    Color4.LerpToRef((<ColorGradient>currentGradient).color1, (<ColorGradient>nextGradient).color1, scale, tmpColor);
+                    data[x * 4] = tmpColor.r * 255;
+                    data[x * 4 + 1] = tmpColor.g * 255;
+                    data[x * 4 + 2] = tmpColor.b * 255;
+                    data[x * 4 + 3] = tmpColor.a * 255;
+                });
+
+            }
+
+            this._colorGradientsTexture = RawTexture.CreateRGBATexture(data, this._rawTextureWidth, 1, this._scene, false, false, Texture.NEAREST_SAMPLINGMODE);
+        }
 
         /**
-         * Renders the particle system in its current state.
+         * Renders the particle system in its current state
+         * @param preWarm defines if the system should only update the particles but not render them
          * @returns the current number of particles
          */
-        public render(): number {
+        public render(preWarm = false): number {
             if (!this._started) {
                 return 0;
             }
+
+            this._createColorGradientTexture();
+            this._createSizeGradientTexture();
+            this._createAngularSpeedGradientTexture();
+            this._createVelocityGradientTexture();
 
             this._recreateUpdateEffect();
             this._recreateRenderEffect();
@@ -545,37 +1144,79 @@
                 return 0;
             }
 
-            if (this._currentRenderId === this._scene.getRenderId()) {
-                return 0;
-            }
+            if (!preWarm) {
+                if (!this._preWarmDone && this.preWarmCycles) {                
+                    for (var index = 0; index < this.preWarmCycles; index++) {
+                        this.animate(true);
+                        this.render(true);
+                    }
 
-            this._currentRenderId = this._scene.getRenderId();      
+                    this._preWarmDone = true;
+                }
+
+                if (this._currentRenderId === this._scene.getRenderId()) {
+                    return 0;
+                }
+
+                this._currentRenderId = this._scene.getRenderId();      
+            }
             
             // Get everything ready to render
-            this. _initialize();
+            this._initialize();
 
-            this._currentActiveCount = Math.min(this._activeCount, this._currentActiveCount + (this.emitRate * this._timeDelta) | 0);
+            this._accumulatedCount += this.emitRate * this._timeDelta;
+            if (this._accumulatedCount > 1) {
+                var intPart = this._accumulatedCount | 0;
+                this._accumulatedCount -= intPart;
+                this._currentActiveCount = Math.min(this._activeCount, this._currentActiveCount + intPart);
+            }
+
+            if (!this._currentActiveCount) {
+                return 0;
+            }
             
             // Enable update effect
-
             this._engine.enableEffect(this._updateEffect);
             this._engine.setState(false);    
             
             this._updateEffect.setFloat("currentCount", this._currentActiveCount);
             this._updateEffect.setFloat("timeDelta", this._timeDelta);
             this._updateEffect.setFloat("stopFactor", this._stopped ? 0 : 1);
-            this._updateEffect.setFloat3("generalRandoms", Math.random(), Math.random(), Math.random());
             this._updateEffect.setTexture("randomSampler", this._randomTexture);
+            this._updateEffect.setTexture("randomSampler2", this._randomTexture2);
             this._updateEffect.setFloat2("lifeTime", this.minLifeTime, this.maxLifeTime);
             this._updateEffect.setFloat2("emitPower", this.minEmitPower, this.maxEmitPower);
-            this._updateEffect.setDirectColor4("color1", this.color1);
-            this._updateEffect.setDirectColor4("color2", this.color2);
+            if (!this._colorGradientsTexture) {            
+                this._updateEffect.setDirectColor4("color1", this.color1);
+                this._updateEffect.setDirectColor4("color2", this.color2);
+            }
             this._updateEffect.setFloat2("sizeRange", this.minSize, this.maxSize);
-            this._updateEffect.setFloat2("angleRange", this.minAngularSpeed, this.maxAngularSpeed);
+            this._updateEffect.setFloat4("scaleRange", this.minScaleX, this.maxScaleX, this.minScaleY, this.maxScaleY);
+            this._updateEffect.setFloat4("angleRange", this.minAngularSpeed, this.maxAngularSpeed, this.minInitialRotation, this.maxInitialRotation);
             this._updateEffect.setVector3("gravity", this.gravity);
+
+            if (this._sizeGradientsTexture) {      
+                this._updateEffect.setTexture("sizeGradientSampler", this._sizeGradientsTexture);      
+            }
+
+            if (this._angularSpeedGradientsTexture) {      
+                this._updateEffect.setTexture("angularSpeedGradientSampler", this._angularSpeedGradientsTexture);      
+            }
+
+            if (this._velocityGradientsTexture) {      
+                this._updateEffect.setTexture("velocityGradientSampler", this._velocityGradientsTexture);      
+            }
 
             if (this.particleEmitterType) {
                 this.particleEmitterType.applyToShader(this._updateEffect);
+            }
+            if (this._isAnimationSheetEnabled) {
+                this._updateEffect.setFloat3("cellInfos", this.startSpriteCellID, this.endSpriteCellID, this.spriteCellChangeSpeed);
+            }        
+            
+            if (this.noiseTexture) {
+                this._updateEffect.setTexture("noiseSampler", this.noiseTexture);  
+                this._updateEffect.setVector3("noiseStrength", this.noiseStrength);    
             }
 
             let emitterWM: Matrix;
@@ -594,47 +1235,69 @@
             // Update
             this._engine.bindTransformFeedbackBuffer(this._targetBuffer.getBuffer());
             this._engine.setRasterizerState(false);
-            this._engine.beginTransformFeedback();
+            this._engine.beginTransformFeedback(true);
             this._engine.drawArraysType(Material.PointListDrawMode, 0, this._currentActiveCount);
             this._engine.endTransformFeedback();
             this._engine.setRasterizerState(true);
             this._engine.bindTransformFeedbackBuffer(null);
 
-            // Enable render effect
-            this._engine.enableEffect(this._renderEffect);
-            let viewMatrix = this._scene.getViewMatrix();
-            this._renderEffect.setMatrix("view", viewMatrix);
-            this._renderEffect.setMatrix("projection", this._scene.getProjectionMatrix());
-            this._renderEffect.setTexture("textureSampler", this.particleTexture);
-            this._renderEffect.setDirectColor4("colorDead", this.colorDead);
+            if (!preWarm) {
+                // Enable render effect
+                this._engine.enableEffect(this._renderEffect);
+                let viewMatrix = this._scene.getViewMatrix();
+                this._renderEffect.setMatrix("view", viewMatrix);
+                this._renderEffect.setMatrix("projection", this._scene.getProjectionMatrix());
+                this._renderEffect.setTexture("textureSampler", this.particleTexture);
+                this._renderEffect.setVector2("translationPivot", this.translationPivot);
+                if (this._colorGradientsTexture) {
+                    this._renderEffect.setTexture("colorGradientSampler", this._colorGradientsTexture);
+                } else {
+                    this._renderEffect.setDirectColor4("colorDead", this.colorDead);
+                }
 
+                if (this._isAnimationSheetEnabled && this.particleTexture) {
+                    let baseSize = this.particleTexture.getBaseSize();
+                    this._renderEffect.setFloat3("sheetInfos", this.spriteCellWidth / baseSize.width, this.spriteCellHeight / baseSize.height, baseSize.width / this.spriteCellWidth);
+                }
 
-            if (this._scene.clipPlane) {
-                var clipPlane = this._scene.clipPlane;
-                var invView = viewMatrix.clone();
-                invView.invert();
-                this._renderEffect.setMatrix("invView", invView);
-                this._renderEffect.setFloat4("vClipPlane", clipPlane.normal.x, clipPlane.normal.y, clipPlane.normal.z, clipPlane.d);
-            }            
+                if (this._isBillboardBased) {
+                    var camera = this._scene.activeCamera!;
+                    this._renderEffect.setVector3("eyePosition", camera.globalPosition);
+                }
 
-            // Draw order
-            if (this.blendMode === ParticleSystem.BLENDMODE_ONEONE) {
-                this._engine.setAlphaMode(Engine.ALPHA_ONEONE);
-            } else {
-                this._engine.setAlphaMode(Engine.ALPHA_COMBINE);
-            }            
+                if (this._scene.clipPlane) {
+                    var clipPlane = this._scene.clipPlane;
+                    var invView = viewMatrix.clone();
+                    invView.invert();
+                    this._renderEffect.setMatrix("invView", invView);
+                    this._renderEffect.setFloat4("vClipPlane", clipPlane.normal.x, clipPlane.normal.y, clipPlane.normal.z, clipPlane.d);
+                }            
 
-            if (this.forceDepthWrite) {
-                this._engine.setDepthWrite(true);
+                // Draw order
+                switch(this.blendMode)
+                {
+                    case ParticleSystem.BLENDMODE_ADD:
+                        this._engine.setAlphaMode(Engine.ALPHA_ADD);
+                        break;
+                    case ParticleSystem.BLENDMODE_ONEONE:
+                        this._engine.setAlphaMode(Engine.ALPHA_ONEONE);
+                        break;
+                    case ParticleSystem.BLENDMODE_STANDARD:
+                        this._engine.setAlphaMode(Engine.ALPHA_COMBINE);
+                        break;
+                }      
+
+                if (this.forceDepthWrite) {
+                    this._engine.setDepthWrite(true);
+                }
+
+                // Bind source VAO
+                this._engine.bindVertexArrayObject(this._renderVAO[this._targetIndex], null);
+
+                // Render
+                this._engine.drawArraysType(Material.TriangleFanDrawMode, 0, 4, this._currentActiveCount);   
+                this._engine.setAlphaMode(Engine.ALPHA_DISABLE);         
             }
-
-            // Bind source VAO
-            this._engine.bindVertexArrayObject(this._renderVAO[this._targetIndex], null);
-
-            // Render
-            this._engine.drawArraysType(Material.TriangleFanDrawMode, 0, 4, this._currentActiveCount);   
-            this._engine.setAlphaMode(Engine.ALPHA_DISABLE);         
-
             // Switch VAOs
             this._targetIndex++;
             if (this._targetIndex === 2) {
@@ -699,17 +1362,46 @@
 
             this._releaseBuffers();
             this._releaseVAOs();
-         
 
+            if (this._colorGradientsTexture) {
+                this._colorGradientsTexture.dispose();
+                (<any>this._colorGradientsTexture) = null;
+            }
+
+            if (this._sizeGradientsTexture) {
+                this._sizeGradientsTexture.dispose();
+                (<any>this._sizeGradientsTexture) = null;
+            }    
+            
+            if (this._angularSpeedGradientsTexture) {
+                this._angularSpeedGradientsTexture.dispose();
+                (<any>this._angularSpeedGradientsTexture) = null;
+            }             
+
+            if (this._velocityGradientsTexture) {
+                this._velocityGradientsTexture.dispose();
+                (<any>this._velocityGradientsTexture) = null;
+            }                
+         
             if (this._randomTexture) {
                 this._randomTexture.dispose();
                 (<any>this._randomTexture) = null;
             }
 
+            if (this._randomTexture2) {
+                this._randomTexture2.dispose();
+                (<any>this._randomTexture2) = null;
+            }            
+
             if (disposeTexture && this.particleTexture) {
                 this.particleTexture.dispose();
                 this.particleTexture = null;
-            }            
+            }    
+            
+            if (disposeTexture && this.noiseTexture) {
+                this.noiseTexture.dispose();
+                this.noiseTexture = null;
+            }
 
             // Callback
             this.onDisposeObservable.notifyObservers(this);
@@ -745,51 +1437,8 @@
         public serialize(): any {
             var serializationObject: any = {};
 
-            serializationObject.name = this.name;
-            serializationObject.id = this.id;
-
-            // Emitter
-            if ((<AbstractMesh>this.emitter).position) {
-                var emitterMesh = (<AbstractMesh>this.emitter);
-                serializationObject.emitterId = emitterMesh.id;
-            } else {
-                var emitterPosition = (<Vector3>this.emitter);
-                serializationObject.emitter = emitterPosition.asArray();
-            }
-
-            serializationObject.capacity = this.getCapacity();
-
-            if (this.particleTexture) {
-                serializationObject.textureName = this.particleTexture.name;
-            }
-
-            // Animations
-            Animation.AppendSerializedAnimations(this, serializationObject);
-
-            // Particle system
+            ParticleSystem._Serialize(serializationObject, this);
             serializationObject.activeParticleCount = this.activeParticleCount;
-            serializationObject.randomTextureSize = this._randomTextureSize;
-            serializationObject.minSize = this.minSize;
-            serializationObject.maxSize = this.maxSize;
-            serializationObject.minEmitPower = this.minEmitPower;
-            serializationObject.maxEmitPower = this.maxEmitPower;
-            serializationObject.minLifeTime = this.minLifeTime;
-            serializationObject.maxLifeTime = this.maxLifeTime;            
-            serializationObject.minAngularSpeed = this.minAngularSpeed;
-            serializationObject.maxAngularSpeed = this.maxAngularSpeed;
-            serializationObject.emitRate = this.emitRate;
-            serializationObject.gravity = this.gravity.asArray();
-            serializationObject.color1 = this.color1.asArray();
-            serializationObject.color2 = this.color2.asArray();
-            serializationObject.colorDead = this.colorDead.asArray();
-            serializationObject.updateSpeed = this.updateSpeed;
-            serializationObject.targetStopDuration = this.targetStopDuration;
-            serializationObject.blendMode = this.blendMode;
-
-            // Emitter
-            if (this.particleEmitterType) {
-                serializationObject.particleEmitterType = this.particleEmitterType.serialize();
-            }
 
             return serializationObject;            
         }
@@ -805,72 +1454,10 @@
             var name = parsedParticleSystem.name;
             var particleSystem = new GPUParticleSystem(name, {capacity: parsedParticleSystem.capacity, randomTextureSize: parsedParticleSystem.randomTextureSize}, scene);
 
-            if (parsedParticleSystem.id) {
-                particleSystem.id = parsedParticleSystem.id;
+            if (parsedParticleSystem.activeParticleCount) {
+                particleSystem.activeParticleCount = parsedParticleSystem.activeParticleCount;
             }
-
-            // Texture
-            if (parsedParticleSystem.textureName) {
-                particleSystem.particleTexture = new Texture(rootUrl + parsedParticleSystem.textureName, scene);
-                particleSystem.particleTexture.name = parsedParticleSystem.textureName;
-            }
-
-            // Emitter
-            if (parsedParticleSystem.emitterId) {
-                particleSystem.emitter = scene.getLastMeshByID(parsedParticleSystem.emitterId);
-            } else {
-                particleSystem.emitter = Vector3.FromArray(parsedParticleSystem.emitter);
-            }
-
-            // Animations
-            if (parsedParticleSystem.animations) {
-                for (var animationIndex = 0; animationIndex < parsedParticleSystem.animations.length; animationIndex++) {
-                    var parsedAnimation = parsedParticleSystem.animations[animationIndex];
-                    particleSystem.animations.push(Animation.Parse(parsedAnimation));
-                }
-            }
-
-            // Particle system
-            particleSystem.activeParticleCount = parsedParticleSystem.activeParticleCount;
-            particleSystem.minSize = parsedParticleSystem.minSize;
-            particleSystem.maxSize = parsedParticleSystem.maxSize;
-            particleSystem.minLifeTime = parsedParticleSystem.minLifeTime;
-            particleSystem.maxLifeTime = parsedParticleSystem.maxLifeTime;
-            particleSystem.minAngularSpeed = parsedParticleSystem.minAngularSpeed;
-            particleSystem.maxAngularSpeed = parsedParticleSystem.maxAngularSpeed;
-            particleSystem.minEmitPower = parsedParticleSystem.minEmitPower;
-            particleSystem.maxEmitPower = parsedParticleSystem.maxEmitPower;
-            particleSystem.emitRate = parsedParticleSystem.emitRate;
-            particleSystem.gravity = Vector3.FromArray(parsedParticleSystem.gravity);
-            particleSystem.color1 = Color4.FromArray(parsedParticleSystem.color1);
-            particleSystem.color2 = Color4.FromArray(parsedParticleSystem.color2);
-            particleSystem.colorDead = Color4.FromArray(parsedParticleSystem.colorDead);
-            particleSystem.updateSpeed = parsedParticleSystem.updateSpeed;
-            particleSystem.targetStopDuration = parsedParticleSystem.targetStopDuration;
-            particleSystem.blendMode = parsedParticleSystem.blendMode;
-
-            // Emitter
-            if (parsedParticleSystem.particleEmitterType) {
-                let emitterType: IParticleEmitterType;
-                switch (parsedParticleSystem.particleEmitterType.type) {
-                    case "SphereEmitter":
-                        emitterType = new SphereParticleEmitter();
-                        break;
-                    case "SphereDirectedParticleEmitter":
-                        emitterType = new SphereDirectedParticleEmitter();
-                        break;
-                    case "ConeEmitter":
-                        emitterType = new ConeParticleEmitter();
-                        break;
-                    case "BoxEmitter":
-                    default:
-                        emitterType = new BoxParticleEmitter();
-                        break;                                                
-                }
-
-                emitterType.parse(parsedParticleSystem.particleEmitterType);
-                particleSystem.particleEmitterType = emitterType;
-            }
+            ParticleSystem._Parse(parsedParticleSystem, particleSystem, scene, rootUrl);
 
             return particleSystem;
         }        

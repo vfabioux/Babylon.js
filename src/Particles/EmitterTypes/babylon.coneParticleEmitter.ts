@@ -6,22 +6,46 @@ module BABYLON {
      */
     export class ConeParticleEmitter implements IParticleEmitterType {
         private _radius: number;
+        private _angle: number;
         private _height: number;
 
         /**
-         * Gets the radius of the emission cone.
+         * Gets or sets a value indicating where on the radius the start position should be picked (1 = everywhere, 0 = only surface)
+         */
+        public radiusRange = 1;        
+
+        /**
+         * Gets or sets a value indicating where on the height the start position should be picked (1 = everywhere, 0 = only surface)
+         */
+        public heightRange = 1;   
+
+        /**
+         * Gets or sets the radius of the emission cone
          */
         public get radius(): number {
             return this._radius;
         }
 
-        /**
-         * Sets the radius of the emission cone.
-         */
         public set radius(value: number) {
             this._radius = value;
-            if (this.angle !== 0) {
-                this._height = value / Math.tan(this.angle / 2);
+            this._buildHeight();
+        }
+
+        /**
+         * Gets or sets the angle of the emission cone
+         */
+        public get angle(): number {
+            return this._angle;
+        }
+
+        public set angle(value: number) {
+            this._angle = value;
+            this._buildHeight();
+        }        
+
+        private _buildHeight() {
+            if (this._angle !== 0) {
+                this._height =  this._radius / Math.tan(this._angle / 2);
             }
             else {
                 this._height = 1;
@@ -32,30 +56,24 @@ module BABYLON {
          * Creates a new instance ConeParticleEmitter
          * @param radius the radius of the emission cone (1 by default)
          * @param angles the cone base angle (PI by default)
-         * @param directionRandomizer defines how much to randomize the particle direction [0-1]
+         * @param directionRandomizer defines how much to randomize the particle direction [0-1] (default is 0)
          */
-        constructor(radius = 1, 
-            /**
-             * The radius of the emission cone.
-             */
-            public angle = Math.PI, 
-            /**
-             * The cone base angle.
-             */
+        constructor(radius = 1, angle = Math.PI, 
+            /** defines how much to randomize the particle direction [0-1] (default is 0) */
             public directionRandomizer = 0) {
+            this.angle = angle;
             this.radius = radius;
         }
 
         /**
          * Called by the particle System when the direction is computed for the created particle.
-         * @param emitPower is the power of the particle (speed)
          * @param worldMatrix is the world matrix of the particle system
          * @param directionToUpdate is the direction vector to update with the result
          * @param particle is the particle we are computed the direction for
          */
-        public startDirectionFunction(emitPower: number, worldMatrix: Matrix, directionToUpdate: Vector3, particle: Particle): void {
-            if (this.angle === 0) {
-                Vector3.TransformNormalFromFloatsToRef(0, emitPower, 0, worldMatrix, directionToUpdate);
+        public startDirectionFunction(worldMatrix: Matrix, directionToUpdate: Vector3, particle: Particle): void {
+            if (Math.abs(Math.cos(this._angle)) === 1.0) {
+                Vector3.TransformNormalFromFloatsToRef(0, 1.0, 0, worldMatrix, directionToUpdate);
             }
             else {
                 // measure the direction Vector from the emitter to the particle.
@@ -68,7 +86,7 @@ module BABYLON {
                 direction.z += randZ;
                 direction.normalize();
 
-                Vector3.TransformNormalFromFloatsToRef(direction.x * emitPower, direction.y * emitPower, direction.z * emitPower, worldMatrix, directionToUpdate);
+                Vector3.TransformNormalFromFloatsToRef(direction.x, direction.y, direction.z, worldMatrix, directionToUpdate);
             }
         }
 
@@ -80,10 +98,10 @@ module BABYLON {
          */
         startPositionFunction(worldMatrix: Matrix, positionToUpdate: Vector3, particle: Particle): void {
             var s = Scalar.RandomRange(0, Math.PI * 2);
-            var h = Scalar.RandomRange(0, 1);
+            var h = Scalar.RandomRange(0, this.heightRange);
             // Better distribution in a cone at normal angles.
             h = 1 - h * h;
-            var radius = Scalar.RandomRange(0, this._radius);
+            var radius = this._radius - Scalar.RandomRange(0, this._radius * this.radiusRange);
             radius = radius * h;
 
             var randX = radius * Math.sin(s);
@@ -98,7 +116,7 @@ module BABYLON {
          * @returns the new emitter
          */
         public clone(): ConeParticleEmitter {
-            let newOne = new ConeParticleEmitter(this.radius, this.angle, this.directionRandomizer);
+            let newOne = new ConeParticleEmitter(this._radius, this._angle, this.directionRandomizer);
 
             Tools.DeepCopy(this, newOne);
 
@@ -110,9 +128,9 @@ module BABYLON {
          * @param effect defines the update shader
          */        
         public applyToShader(effect: Effect): void {
-            effect.setFloat("radius", this.radius);
-            effect.setFloat("coneAngle", this.angle);
-            effect.setFloat("height", this._height);
+            effect.setFloat2("radius", this._radius, this.radiusRange);
+            effect.setFloat("coneAngle", this._angle);
+            effect.setFloat2("height", this._height, this.heightRange);
             effect.setFloat("directionRandomizer", this.directionRandomizer);
         }
 
@@ -125,11 +143,11 @@ module BABYLON {
         }     
         
         /**
-         * Returns the string "BoxEmitter"
+         * Returns the string "ConeParticleEmitter"
          * @returns a string containing the class name
          */
         public getClassName(): string {
-            return "ConeEmitter";
+            return "ConeParticleEmitter";
         }  
         
         /**
@@ -140,8 +158,8 @@ module BABYLON {
             var serializationObject: any = {};
 
             serializationObject.type = this.getClassName();
-            serializationObject.radius  = this.radius;
-            serializationObject.angle  = this.angle;
+            serializationObject.radius  = this._radius;
+            serializationObject.angle  = this._angle;
             serializationObject.directionRandomizer  = this.directionRandomizer;
 
             return serializationObject;

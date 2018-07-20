@@ -4,7 +4,7 @@ import { extendedConfiguration } from './extended';
 import { ViewerConfiguration } from '../configuration';
 import { shadowDirectionalLightConfiguration, shadowSpotlLightConfiguration } from './shadowLight';
 import { environmentMapConfiguration } from './environmentMap';
-import * as deepmerge from '../../../assets/deepmerge.min.js';
+import { deepmerge } from '../../helper/';
 
 /**
  * Get the configuration type you need to use as the base for your viewer.
@@ -28,17 +28,17 @@ let getConfigurationType = function (types: string): ViewerConfiguration {
             case 'shadowSpotLight':
                 config = deepmerge(config, shadowSpotlLightConfiguration);
                 break;
-            case 'extended':
-                config = deepmerge(config, extendedConfiguration);
+            case 'default':
+                config = deepmerge(config, defaultConfiguration);
                 break;
             case 'minimal':
                 config = deepmerge(config, minimalConfiguration);
                 break;
             case 'none':
                 break;
-            case 'default':
+            case 'extended':
             default:
-                config = deepmerge(config, defaultConfiguration);
+                config = deepmerge(config, extendedConfiguration);
                 break;
         }
 

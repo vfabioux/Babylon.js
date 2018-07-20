@@ -1,4 +1,23 @@
 ﻿module BABYLON {
+    export interface AbstractScene {
+        /**
+         * Return a the first highlight layer of the scene with a given name.
+         * @param name The name of the highlight layer to look for.
+         * @return The highlight layer if found otherwise null.
+         */
+        getHighlightLayerByName(name: string): Nullable<HighlightLayer>;
+    }
+
+    AbstractScene.prototype.getHighlightLayerByName = function(name: string): Nullable<HighlightLayer> {
+        for (var index = 0; index < this.effectLayers.length; index++) {
+            if (this.effectLayers[index].name === name && this.effectLayers[index].getEffectName() === HighlightLayer.EffectName) {
+                return (<any>this.effectLayers[index]) as HighlightLayer;
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Special Glow Blur post process only blurring the alpha channel
      * It enforces keeping the most luminous color in the color channel.
@@ -61,6 +80,11 @@
          * Should we display highlight as a solid stroke?
          */
         isStroke?: boolean;
+
+        /**
+         * The rendering group to draw the layer in.
+         */
+        renderingGroupId: number;
     }
 
     /**
@@ -225,6 +249,7 @@
                 blurVerticalSize: 1.0,
                 alphaBlendingMode: Engine.ALPHA_COMBINE,
                 camera: null,
+                renderingGroupId: -1,
                 ...options,
             };
 
@@ -233,7 +258,8 @@
                 alphaBlendingMode: this._options.alphaBlendingMode,
                 camera: this._options.camera,
                 mainTextureFixedSize: this._options.mainTextureFixedSize,
-                mainTextureRatio: this._options.mainTextureRatio
+                mainTextureRatio: this._options.mainTextureRatio,
+                renderingGroupId: this._options.renderingGroupId
             });
 
             // Do not render as long as no meshes have been added
@@ -271,6 +297,14 @@
             blurTextureWidth = this._engine.needPOTTextures ? Tools.GetExponentOfTwo(blurTextureWidth, this._maxSize) : blurTextureWidth;
             blurTextureHeight = this._engine.needPOTTextures ? Tools.GetExponentOfTwo(blurTextureHeight, this._maxSize) : blurTextureHeight;
 
+            var textureType = 0;
+            if (this._engine.getCaps().textureHalfFloatRender) {
+                textureType = Engine.TEXTURETYPE_HALF_FLOAT;
+            }
+            else {
+                textureType = Engine.TEXTURETYPE_UNSIGNED_INT;
+            }
+
             this._blurTexture = new RenderTargetTexture("HighlightLayerBlurRTT",
                 {
                     width: blurTextureWidth,
@@ -279,7 +313,7 @@
                 this._scene,
                 false,
                 true,
-                Engine.TEXTURETYPE_HALF_FLOAT);
+                textureType);
             this._blurTexture.wrapU = Texture.CLAMP_ADDRESSMODE;
             this._blurTexture.wrapV = Texture.CLAMP_ADDRESSMODE;
             this._blurTexture.anisotropicFilteringLevel = 16;
@@ -315,7 +349,7 @@
                         width:  blurTextureWidth,
                         height: blurTextureHeight
                     },
-                    null, Texture.BILINEAR_SAMPLINGMODE, this._scene.getEngine(), false, Engine.TEXTURETYPE_HALF_FLOAT);
+                    null, Texture.BILINEAR_SAMPLINGMODE, this._scene.getEngine(), false, textureType);
                 this._horizontalBlurPostprocess.width = blurTextureWidth;
                 this._horizontalBlurPostprocess.height = blurTextureHeight;
                 this._horizontalBlurPostprocess.onApplyObservable.add(effect => {
@@ -326,7 +360,7 @@
                         width:  blurTextureWidth,
                         height: blurTextureHeight
                     },
-                    null, Texture.BILINEAR_SAMPLINGMODE, this._scene.getEngine(), false, Engine.TEXTURETYPE_HALF_FLOAT);
+                    null, Texture.BILINEAR_SAMPLINGMODE, this._scene.getEngine(), false, textureType);
 
                 this._postProcesses = [this._horizontalBlurPostprocess, this._verticalBlurPostprocess];
             }
@@ -452,6 +486,10 @@
                 return false;
             };
 
+            if (!super.hasMesh(mesh)) {
+                return false;
+            }
+
             return true;
         }
 
@@ -545,6 +583,10 @@
                 return false;
             }
 
+            if (!super.hasMesh(mesh)) {
+                return false;
+            }
+
             return this._meshes[mesh.uniqueId] !== undefined && this._meshes[mesh.uniqueId] !== null;
         }
 
@@ -579,6 +621,10 @@
                     observerDefault: mesh.onAfterRenderObservable.add(this._defaultStencilReference),
                     glowEmissiveOnly: glowEmissiveOnly
                 };
+
+                mesh.onDisposeObservable.add(() => {
+                    this._disposeMesh(mesh);
+                });
             }
 
             this._shouldRender = true;
